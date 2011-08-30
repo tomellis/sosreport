@@ -361,43 +361,34 @@ class Policy(object):
 
         fp.close()
 
-    def pkgProvides(self, name):
-        return self.pkgByName(name).get('providename')
-
-    def pkgRequires(self, name):
-        return self.pkgByName(name).get('requirename')
+    def _get_rpm_list(self):
+        pkg_list = subprocess.Popen(["rpm", "-qa", "--queryformat", "%{NAME}|%{VERSION}\\n"],
+            stdout=subprocess.PIPE).communicate()[0].splitlines()
+        self._rpms = {}
+        for pkg in pkg_list:
+            name, version = pkg.split("|")
+            self._rpms[name] = {
+                    'name': name,
+                    'version', version
+                    }
 
     def allPkgsByName(self, name):
-        return self.allPkgs("name", name)
+        return fnmatch.filter(self.allPkgs().keys(), name)
 
-    def allPkgsByNameRegex(self, regex_name):
-        reg = re.compile(regex_name)
-        return [pkg for pkg in self.allPkgs() if reg.match(pkg['name'])]
+    def allPkgsByNameRegex(self, regex_name, flags=None):
+        reg = re.compile(regex_name, flags)
+        return [pkg for pkg in self.allPkgs().keys() if reg.match(pkg)]
 
     def pkgByName(self, name):
-        # TODO: do a full NEVRA compare and return newest version, best arch
         try:
-            # lame attempt at locating newest
-            return self.allPkgsByName(name)[-1]
-        except:
-            return {}
-
-    def allPkgs(self, ds = None, value = None):
-        import rpm
-        # if possible return the cached values
-        try:                   return self._cache_rpm[ "%s-%s" % (ds,value) ]
-        except AttributeError: self._cache_rpm = {}
-        except KeyError:       pass
-
-        ts = rpm.TransactionSet()
-        if ds and value:
-            mi = ts.dbMatch(ds, value)
+            self.AllPkgsByName(name)[-1]
         else:
-            mi = ts.dbMatch()
+            return None
 
-        self._cache_rpm[ "%s-%s" % (ds,value) ] = [pkg for pkg in mi]
-        del mi, ts
-        return self._cache_rpm[ "%s-%s" % (ds,value) ]
+    def allPkgs(self):
+        if not self._rpms:
+            self._rpms = self._get_rpm_list()
+        return self._rpms
 
     def validatePlugin(self, plugin_class):
         "Checks that the plugin will execute given the environment"

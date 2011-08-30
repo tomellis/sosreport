@@ -118,7 +118,7 @@ class Plugin(object):
     def isInstalled(self, package_name):
         '''Is the package $package_name installed?
         '''
-        return (self.policy().pkgByName(package_name) != {})
+        return (self.policy().pkgByName(package_name) is not None)
 
     def getCopiedFilePaths(self, srcpath):
         """Generator function that returns the absolute path
