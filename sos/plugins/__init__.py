@@ -319,14 +319,23 @@ class Plugin(object):
         '''
         return self.getOption(optionname)
 
-    def getOption(self, optionname):
+    def getOption(self, optionname, default=0):
         ''' see whether the named option is enabled.
         '''
         for name, parms in izip(self.optNames, self.optParms):
             if name == optionname:
                 return parms['enabled']
         # nonexistent options aren't enabled.
-        return 0
+        return default
+
+    def getOptionAsList(self, optionname, delimiter=",", default=None):
+        '''Will try to return the option as a list separated by the delimiter'''
+        option = self.getOption(optionname)
+        try:
+            opt_list = [opt.strip() for opt in option.split(delimiter)]
+            return filter(None, opt_list)
+        except Exception:
+            return default
 
     def addCopySpecLimit(self, fname, sizelimit = None):
         """Add a file specification (with limits)
@@ -615,6 +624,9 @@ class RedHatPlugin(object):
     """Tagging class to indicate that this plugin works with Red Hat Linux"""
     pass
 
+class IndependentPlugin(object):
+    """Tagging class that indicates this plugin can run on any platform"""
+    pass
 
 def import_plugin(name):
     """Import name as a module and return a list of all classes defined in that

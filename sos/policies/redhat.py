@@ -35,7 +35,7 @@ from subprocess import Popen, PIPE, call
 from collections import deque
 
 from sos import _sos as _
-from sos.plugins import RedHatPlugin
+from sos.plugins import RedHatPlugin, IndependentPlugin
 
 sys.path.insert(0, "/usr/share/rhn/")
 try:
@@ -369,7 +369,7 @@ class Policy(object):
             name, version = pkg.split("|")
             self._rpms[name] = {
                     'name': name,
-                    'version', version
+                    'version': version
                     }
 
     def allPkgsByName(self, name):
@@ -382,7 +382,7 @@ class Policy(object):
     def pkgByName(self, name):
         try:
             self.AllPkgsByName(name)[-1]
-        else:
+        except Exception:
             return None
 
     def allPkgs(self):
@@ -392,7 +392,7 @@ class Policy(object):
 
     def validatePlugin(self, plugin_class):
         "Checks that the plugin will execute given the environment"
-        return issubclass(plugin_class, RedHatPlugin)
+        return issubclass(plugin_class, RedHatPlugin) or issubclass(plugin_class, IndependentPlugin)
 
     def check(self):
         "This method checks to see if we are running on RHEL. It returns True or False."

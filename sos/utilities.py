@@ -31,6 +31,21 @@ from subprocess import Popen, PIPE
 import logging
 import zipfile
 
+try:
+    import hashlib as md5
+except ImportError:
+    import md5
+
+def md5sum(filename, chunk_size=128):
+    """Returns the md5 sum of the supplied filename. The file is read in chunk_size blocks"""
+    fd = open(filename, 'rb')
+    data = fd.read(chunk_size)
+    md5_obj = md5.md5()
+    while data:
+        md5_obj.update(data)
+        data = fd.read(chunk_size)
+    return md5_obj.hexdigest()
+
 
 class DirTree(object):
     """Builds an ascii representation of a directory structure"""
