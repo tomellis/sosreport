@@ -18,8 +18,6 @@ class EAP6(Plugin, IndependentPlugin):
 
     optionList = [("home",  'JBoss\'s installation dir (i.e. JBOSS_HOME)', '', False),
                   ("javahome",  'Java\'s installation dir (i.e. JAVA_HOME)', '', False),
-                  ("profile", 'comma separated list of server profiles to limit collection. \
-Default=\'all default minimal production standard web\'.', '', False),
                   ("user",  'JBoss JMX invoker user to be used with twiddle.', '', False),
                   ("pass",  'JBoss JMX invoker user\'s password to be used with twiddle.', '', False),
                   ("logsize", 'max size (MiB) to collect per log file', '', 15),
@@ -35,6 +33,10 @@ Default=\'all default minimal production standard web\'.', '', False),
     __jbossSystemJarDirs = [ "client", "lib" , "common/lib" ]
     __jbossServerConfigDirs = ["all", "default", "minimal", "production", "standard", "web"]
     __jbossHTMLBody=None
+
+    def __alert(self, msg):
+        print msg
+        self.addAlert(msg)
 
     def __getJbossHome(self):
         """
@@ -76,9 +78,7 @@ Default=\'all default minimal production standard web\'.', '', False),
 
             return True
         else:
-            msg = "ERROR: The path to the JBoss installation directory does not exist.  Path is: " + self.__jbossHome
-            print msg
-            self.addAlert(msg)
+            self.__alert("ERROR: The path to the JBoss installation directory does not exist.  Path is: " + self.__jbossHome)
             return False
 
     def __getJavaHome(self):
@@ -102,14 +102,14 @@ Default=\'all default minimal production standard web\'.', '', False),
                           javaHome)
         else:
             ## Test to see if Java is already in the PATH
-            (status, output, rtime) = self.callExtProg("java -version")
-            if (status == 0):
+            status = self.checkExtProg("java -version")
+            if status:
                 self.addAlert("INFO: The Java installation directory is in the system path.")
-                return True
             else:
                 self.addAlert("ERROR: The Java installation directory was not supplied.\
                 The JBoss SOS plug-in will not collect twiddle data.")
-                return False
+
+            return status
 
 
         java=os.path.join(javaHome, java)
@@ -119,9 +119,7 @@ Default=\'all default minimal production standard web\'.', '', False),
             os.environ['PATH'] = os.path.join(javaHome, "bin") + os.pathsep + os.environ['PATH']
             return True
         else:
-            msg = "ERROR: The path to the Java installation directory does not exist.  Path is: %s" % (javaHome)
-            print msg
-            self.addAlert(msg)
+            self.__alert("ERROR: The path to the Java installation directory does not exist.  Path is: %s" % (javaHome))
             return False
 
 
@@ -236,14 +234,12 @@ Default=\'all default minimal production standard web\'.', '', False),
         real memory.
         """
 
-        retVal="????????????????????????????????"
+        retVal = "?" * 32
 
         try:
             retVal = md5sum(file, self.__MD5_CHUNK_SIZE)
         except IOError, ioe:
-            msg = "ERROR: Unable to open %s for reading.  Error: " % (file,ioe)
-            print msg
-            self.addAlert(msg)
+            self.__alert("ERROR: Unable to open %s for reading.  Error: %s" % (file,ioe))
 
         return retVal
 
@@ -253,20 +249,16 @@ Default=\'all default minimal production standard web\'.', '', False),
         Given a jar file, this function will extract the Manifest and return it's contents
         as a string.
         """
-        manifest=None
+        manifest = None
         try:
             zf = zipfile.ZipFile(jarFile)
             try:
-                manifest=zf.read("META-INF/MANIFEST.MF")
+                manifest = zf.read("META-INF/MANIFEST.MF")
             except Exception, e:
-                msg="ERROR: reading manifest from %s.  Error: %s" % (jarFile, e)
-                print msg
-                self.addAlert(msg)
+                self.__alert("ERROR: reading manifest from %s.  Error: %s" % (jarFile, e))
             zf.close()
         except Exception, e:
-                msg="ERROR: reading contents of %s.  Error: %s" % (jarFile, e)
-                print msg
-                self.addAlert(msg)
+                self.__alert("ERROR: reading contents of %s.  Error: %s" % (jarFile, e))
         return manifest
 
     def __getStdJarInfo(self):

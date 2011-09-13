@@ -42,11 +42,17 @@ import logging
 
 
 def commonPrefix(l1, l2, common = None):
+    """
+    Returns a tuple like the following:
+        ([common, elements, from l1, and l2], [[tails, from, l1], [tails, from, l2]])
+
+    >>> commonPrefix(['usr','share','foo'], ['usr','share','bar'])
+    (['usr','share'], [['foo'], ['bar']])
+    """
     if common is None:
         common = []
-    ''' return a list of common elements at the start of all sequences,
-        then a list of lists that are the unique tails of each sequence. '''
-    if len(l1) < 1 or len(l2) < 1 or  l1[0] != l2[0]: return common, [l1, l2]
+    if len(l1) < 1 or len(l2) < 1 or  l1[0] != l2[0]:
+        return (common, [l1, l2])
     return commonPrefix(l1[1:], l2[1:], common+[l1[0]])
 
 def sosRelPath(path1, path2, sep=os.path.sep, pardir=os.path.pardir):
@@ -383,6 +389,14 @@ class Plugin(object):
         # pylint: disable-msg = W0612
         status, shout, runtime = sosGetCommandOutput(prog)
         return (status, shout, runtime)
+
+    def checkExtprog(self, prog):
+        """ Execute a command independently of the output gathering part of
+        sosreport and check the return code. Return True for a return code of 0
+        and False otherwise."""
+        (status, output, runtime) = self.callExtProg(prog)
+        return (status == 0)
+
 
     def collectExtOutput(self, exe, suggest_filename = None, root_symlink = None, timeout = 300):
         """

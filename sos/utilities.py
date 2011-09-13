@@ -21,6 +21,7 @@
 # pylint: disable-msg = W0613
 
 import os
+import re
 import sys
 import string
 import fnmatch
@@ -30,6 +31,8 @@ from itertools import *
 from subprocess import Popen, PIPE
 import logging
 import zipfile
+import tarfile
+from StringIO import StringIO
 
 try:
     import hashlib as md5
@@ -244,4 +247,68 @@ def import_module(module_fqname, superclass=None):
         modules = [m for m in modules if issubclass(m, superclass)]
 
     return modules
+
+
+class TarFileArchive(object):
+
+    def __init__(self, name):
+        name = "%s.tar" % name
+        self.tarfile = tarfile.open(name, mode="w")
+
+    def add_file(self, src, dest=None):
+        self.tarfile.add(src, arcname=dest)
+
+    def add_string(self, content, dest):
+        tar_info = tarfile.TarInfo(name=dest)
+        tar_info.size = len(content)
+        self.tarfile.addfile(tar_info, StringIO(content))
+
+    def close(self):
+        self.tarfile.close()
+
+
+class ZipFileArchive(object):
+
+    def __init__(self, name):
+        name = "%s.zip" % name
+        try:
+            import zlib
+            compression = zipfile.ZIP_DEFLATED
+        except:
+            compression = zipfile.ZIP_STORED
+
+        self.zipfile = zipfile.ZipFile(name, mode="w")
+
+    def add_file(self, src, dest=None):
+        if os.path.isdir(src):
+            # We may not need, this, but if we do I only want to do it
+            # one time
+            regex = re.compile(r"^" + src)
+            for path, dirnames, filenames in os.walk(src):
+                for filename in filenames:
+                    filename = path + filename
+                    if dest:
+                        self.zipfile.write(filename, re.sub(regex, dest, filename))
+                    else:
+                        self.zipfile.write(filename)
+        else:
+            if dest:
+                self.zipfile.write(src, dest)
+            else:
+                self.zipfile.write(src)
+
+    def add_string(self, content, dest):
+        self.zipfile.writestr(dest, content)
+
+    def close(self):
+        self.zipfile.close()
+
+
+
+
+
+
+
+
+
 # vim:ts=4 sw=4 et
