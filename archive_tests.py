@@ -45,6 +45,12 @@ class ZipFileArchiveTest(unittest.TestCase):
 
         self.check_for_file('tests_renamed/worker.py')
 
+    def test_add_string(self):
+        self.zf.add_string('this is content', 'tests/string_test.txt')
+        self.zf.close()
+
+        self.check_for_file('tests/string_test.txt')
+
 class TarFileArchiveTest(unittest.TestCase):
 
     def setUp(self):
@@ -86,6 +92,11 @@ class TarFileArchiveTest(unittest.TestCase):
 
         self.check_for_file('tests_renamed/worker.py')
 
+    def test_add_string(self):
+        self.tf.add_string('this is content', 'tests/string_test.txt')
+        self.tf.close()
+
+        self.check_for_file('tests/string_test.txt')
 
 if __name__ == "__main__":
     unittest.main()
