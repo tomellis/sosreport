@@ -47,6 +47,7 @@ from time import strftime, localtime
 from collections import deque
 from itertools import izip
 import zipfile
+import textwrap
 
 from sos import _sos as _
 from sos import __version__
@@ -281,20 +282,6 @@ No changes will be made to your system.
     def print_header(self):
         print "\n%s\n" % _("sosreport (version %s)" % (__version__,))
 
-    def textcolor(self, text, color, raw=0):
-        """ Terminal text coloring function """
-        if self.opts.nocolors or not sys.stdout.isatty():
-            return text
-        colors = {  "black":"30", "red":"31", "green":"32", "brown":"33", "blue":"34",
-                    "purple":"35", "cyan":"36", "lgray":"37", "gray":"1;30", "lred":"1;31",
-                    "lgreen":"1;32", "yellow":"1;33", "lblue":"1;34", "pink":"1;35",
-                    "lcyan":"1;36", "white":"1;37" }
-        opencol = "\033["
-        closecol = "m"
-        clear = opencol + "0" + closecol
-        f = opencol + colors[color] + closecol
-        return "%s%s%s" % (f, text, clear)
-
     def get_commons(self):
         return {'dstroot': self.dstroot,
                 'cmddir': self.cmddir,
@@ -442,10 +429,11 @@ No changes will be made to your system.
         return (self.opts.onlyplugins and
                 not plugin_name in self.opts.onlyplugins)
 
-    def _skip(self, plugin_class):
+    def _skip(self, plugin_class, reason="unknown"):
         self.skipped_plugins.append((
             plugin_class.name(),
-            plugin_class(self.get_commons())
+            plugin_class(self.get_commons()),
+            reason
         ))
 
     def _load(self, plugin_class):
@@ -470,12 +458,12 @@ No changes will be made to your system.
                 for plugin_class in plugin_classes:
                     if not self.policy.validatePlugin(plugin_class):
                         self.soslog.warning(_("plugin %s does not validate, skipping") % plug)
-                        self._skip(plugin_class)
+                        self._skip(plugin_class, "does not validate")
                         continue
 
                     if plugin_class.requires_root and not self._is_root:
                         self.soslog.warning(_("plugin %s requires root permissions to execute, skipping") % plug)
-                        self._skip(plugin_class)
+                        self._skip(plugin_class, "requires root")
                         continue
 
                     # plug-in is valid, let's decide whether run it or not
@@ -486,7 +474,7 @@ No changes will be made to your system.
                             self._is_not_default(plugbase, plugin_class),
                             self._is_not_specified(plugbase),
                             )):
-                        self._skip(plugin_class)
+                        self._skip(plugin_class, "inactive")
                         continue
 
                     self._load(plugin_class)
@@ -579,8 +567,7 @@ No changes will be made to your system.
             print _("The following plugins are currently enabled:")
             print
             for (plugname, plug) in self.loaded_plugins:
-                print " %-25s  %s" % (self.textcolor(plugname,"lblue"),
-                                     plug.get_description())
+                print " %-15s %s" % (plugname, plug.get_description())
         else:
             print _("No plugin enabled.")
         print
@@ -588,8 +575,9 @@ No changes will be made to your system.
         if self.skipped_plugins:
             print _("The following plugins are currently disabled:")
             print
-            for (plugname, plugclass) in self.skipped_plugins:
-                print " %-25s  %s" % (self.textcolor(plugname,"cyan"),
+            for (plugname, plugclass, reason) in self.skipped_plugins:
+                print " %-15s %-14s %s" % (plugname,
+                                     reason,
                                      plugclass.get_description())
         print
 
@@ -600,18 +588,13 @@ No changes will be made to your system.
                 # format and colorize option value based on its type (int or bool)
                 if type(optparm["enabled"]) == bool:
                     if optparm["enabled"] == True:
-                        tmpopt = self.textcolor("on","lred")
+                        tmpopt = "on"
                     else:
-                        tmpopt = self.textcolor("off","red")
-                elif type(optparm["enabled"]) == int:
-                    if optparm["enabled"] > 0:
-                        tmpopt = self.textcolor(optparm["enabled"],"lred")
-                    else:
-                        tmpopt = self.textcolor(optparm["enabled"],"red")
+                        tmpopt = "off"
                 else:
                     tmpopt = optparm["enabled"]
 
-                print " %-21s %-5s %s" % (plugname + "." + optname,
+                print " %-25s %-15s %s" % (plugname + "." + optname,
                                           tmpopt, optparm["desc"])
         else:
             print _("No plugin options available.")
@@ -663,7 +646,7 @@ No changes will be made to your system.
             for plugname, plug in self.loaded_plugins:
                 for tmpcount2 in range(0, len(plug.diagnose_msgs)):
                     if tmpcount2 == 0:
-                        soslog.warning( self.textcolor("%s:" % plugname, "red") )
+                        soslog.warning("%s:" % plugname)
                     soslog.warning("    * %s" % plug.diagnose_msgs[tmpcount2])
                     fp.write("%s: %s\n" % (plugname, plug.diagnose_msgs[tmpcount2]))
             fp.close()
@@ -723,7 +706,7 @@ No changes will be made to your system.
         for plugname, plug in self.loaded_plugins:
             for oneFile in plug.copiedFiles:
                 try:
-                    xmlrep.add_file(oneFile["srcpath"], os.stat(oneFile["srcpath"]))
+                    self.xml_report.add_file(oneFile["srcpath"], os.stat(oneFile["srcpath"]))
                 except:
                     pass
 

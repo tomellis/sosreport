@@ -434,6 +434,9 @@ class Plugin(object):
 
         return outfn
 
+    def addStringAsFile(self, content, filename):
+        pass
+
     def collectOutputNow(self, exe, suggest_filename = None, root_symlink = False, timeout = 300):
         """ Execute a command and save the output to a file for inclusion in
         the report

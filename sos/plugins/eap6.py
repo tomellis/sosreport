@@ -11,10 +11,10 @@ from sos.plugins import Plugin, IndependentPlugin
 from sos.utilities import DirTree, find, md5sum
 
 class EAP6(Plugin, IndependentPlugin):
-    requires_root = False
-
     """JBoss related information
     """
+
+    requires_root = False
 
     optionList = [("home",  'JBoss\'s installation dir (i.e. JBOSS_HOME)', '', False),
                   ("javahome",  'Java\'s installation dir (i.e. JAVA_HOME)', '', False),
