@@ -48,9 +48,11 @@ from collections import deque
 from itertools import izip
 import zipfile
 import textwrap
+import tempfile
 
 from sos import _sos as _
 from sos import __version__
+from sos.utilities import TarFileArchive, ZipFileArchive
 
 if os.path.isfile('/etc/fedora-release'):
     __distro__ = 'Fedora'
@@ -157,6 +159,9 @@ def parse_options(opts):
     parser.add_option("--profile", action="store_true",
                          dest="profiler",
                          help="turn on profiling", default=False)
+    parser.add_option("-z", "--compression-type", dest="compression_type",
+                        help="compression technology to use [auto, zip, gz, bz2, xz] (default=auto)",
+                        default="auto")
 
     return parser.parse_args(opts)
 
@@ -292,7 +297,17 @@ No changes will be made to your system.
                 'verbosity': self.opts.verbosity,
                 'xmlreport': self.xml_report,
                 'cmdlineopts': self.opts,
-                'config': self.config }
+                'config': self.config}
+
+    def _set_archive(self, base_dir=tempfile.gettempdir()):
+        archive_name = os.path.join(base_dir,self.policy.getArchiveName())
+        if self.opts.compression_type == 'auto':
+            auto_archive = self.policy.preferedArchive()
+            self.archive = auto_archive(archive_name)
+        elif self.opts.compression_type == 'zip':
+            self.archive = ZipFileArchive(archive_name)
+        else:
+            self.archive = TarFileArchive(archive_name)
 
     def _set_directories(self):
         self.dstroot = self.policy.getDstroot(self.opts.tmp_dir)
@@ -300,15 +315,9 @@ No changes will be made to your system.
             print _("Could not create temporary directory.")
             self._exit()
 
-        self.cmddir = os.path.join(self.dstroot,
-                                   'sos_commands')
-        self.logdir = os.path.join(self.dstroot,
-                                   'sos_logs')
-        self.rptdir = os.path.join(self.dstroot,
-                                   'sos_reports')
-        os.mkdir(self.cmddir, 0755)
-        os.mkdir(self.logdir, 0755)
-        os.mkdir(self.rptdir, 0755)
+        self.cmddir = 'sos_commands'
+        self.logdir = 'sos_logs'
+        self.rptdir = 'sos_reports'
 
     def _set_debug(self):
         if self.opts.debug:
@@ -381,14 +390,16 @@ No changes will be made to your system.
             self.opts.batch = True
 
         # log to a file
-        flog = logging.FileHandler(os.path.join(self.logdir, "sos.log"))
+        self.sos_log_file = tempfile.NamedTemporaryFile()
+        flog = logging.FileHandler(self.sos_log_file.name)
         flog.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
         flog.setLevel(logging.VERBOSE3)
         self.soslog.addHandler(flog)
 
         if self.opts.profiler:
             # setup profile log
-            plog = logging.FileHandler(os.path.join(logdir, "sosprofile.log"))
+            self.sos_profile_log_file = tempfile.NamedTemporaryFile()
+            plog = logging.FileHandler(self.sos_profile_log_file.name)
             plog.setFormatter(logging.Formatter('%(message)s'))
             plog.setLevel(logging.DEBUG)
             self.proflog.addHandler(plog)
@@ -396,12 +407,20 @@ No changes will be made to your system.
         # define a Handler which writes INFO messages or higher to the sys.stderr
         console = logging.StreamHandler(sys.stderr)
         if self.opts.verbosity > 0:
-            console.setLevel(20 - self.opts.verbosity)
+            console.setLevel(logging.DEBUG)
         else:
             console.setLevel(logging.INFO)
         console.setFormatter(logging.Formatter('%(message)s'))
         self.soslog.addHandler(console)
 
+    def _finish_logging(self):
+        if getattr(self, "sos_log_file", None):
+            self.sos_log_file.flush()
+            self.archive.add_file(self.sos_log_file.name, dest=os.path.join('sos_logs', 'sos.log'))
+        if getattr(self, "sos_profile_log_file", None):
+            self.sos_profile_log_file.flush()
+            self.archive.add_file(self.sos_profile_log_file.name, dest=os.path.join('sos_logs', 'profile.log'))
+        logging.shutdown()
 
     def _get_disabled_plugins(self):
         disabled = []
@@ -409,7 +428,6 @@ No changes will be made to your system.
             disabled = [plugin.strip() for plugin in
                         self.config.get("plugins", "disable").split(',')]
         return disabled
-
 
     def _is_skipped(self, plugin_name):
         return (plugin_name in self.opts.noplugins or
@@ -457,12 +475,12 @@ No changes will be made to your system.
 
                 for plugin_class in plugin_classes:
                     if not self.policy.validatePlugin(plugin_class):
-                        self.soslog.warning(_("plugin %s does not validate, skipping") % plug)
+                        self.soslog.debug(_("plugin %s does not validate, skipping") % plug)
                         self._skip(plugin_class, "does not validate")
                         continue
 
                     if plugin_class.requires_root and not self._is_root:
-                        self.soslog.warning(_("plugin %s requires root permissions to execute, skipping") % plug)
+                        self.soslog.debug(_("plugin %s requires root permissions to execute, skipping") % plug)
                         self._skip(plugin_class, "requires root")
                         continue
 
@@ -548,7 +566,7 @@ No changes will be made to your system.
                                       self.opts.enableplugins):
             plugin_name = plugin.split(".")[0]
             if not plugin_name in self.plugin_names:
-                soslog.error('a non-existing plugin (%s) was specified in the '
+                self.soslog.error('a non-existing plugin (%s) was specified in the '
                              'command line' % (plugin_name))
                 self._exit(1)
 
@@ -613,16 +631,8 @@ No changes will be made to your system.
                 print
                 self._exit()
 
-    def _exception_to_logfile(self, logfile_name):
-        error_log = open(logfile_name, 'a')
-        etype, eval, etrace = sys.exc_info()
-        traceback.print_exception(etype, eval, etrace, limit=2, file=sys.stdout)
-        error_log.write(traceback.format_exc())
-        error_log.close()
-
     def _log_plugin_exception(self):
-        self._exception_to_logfile(
-            os.path.join(self.logdir, "sosreport-plugin-errors.txt"))
+        self.soslog.error(traceback.format_exc())
 
     def diagnose(self):
         tmpcount = 0
@@ -669,11 +679,12 @@ No changes will be made to your system.
 
     def prework(self):
         self.policy.preWork()
-
+        self._set_archive()
 
     def setup(self):
         for plugname, plug in self.loaded_plugins:
             try:
+                plug.setArchive(self.archive)
                 plug.setup()
             except KeyboardInterrupt:
                 raise
@@ -790,7 +801,7 @@ No changes will be made to your system.
             sys.exit(0)
 
         # package up the results for the support organization
-        self.policy.packageResults()
+        self.policy.packageResults(self.archive.name())
 
         # delete gathered files
         self.policy.cleanDstroot()
@@ -806,7 +817,9 @@ No changes will be made to your system.
             self.policy.uploadResults()
 
         # Close all log files and perform any cleanup
-        logging.shutdown()
+        self._finish_logging()
+
+        self.archive.close()
 
     def ensure_plugins(self):
         if not self.loaded_plugins:

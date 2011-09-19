@@ -33,6 +33,9 @@ import logging
 import zipfile
 import tarfile
 from StringIO import StringIO
+import time
+import pwd
+import grp
 
 try:
     import hashlib as md5
@@ -248,36 +251,57 @@ def import_module(module_fqname, superclass=None):
 
     return modules
 
+class Archive(object):
 
-class TarFileArchive(object):
+    _name = "unset"
+
+    def prepend(self, src):
+        name = os.path.split(self._name)[-1]
+        return os.path.join(name, src.lstrip(os.sep))
+
+
+class TarFileArchive(Archive):
 
     def __init__(self, name):
-        name = "%s.tar" % name
-        self.tarfile = tarfile.open(name, mode="w")
+        self._name = name
+        self.tarfile = tarfile.open(self.name(), mode="w")
+
+    def name(self):
+        return "%s.tar" % self._name
 
     def add_file(self, src, dest=None):
+        if dest:
+            dest = self.prepend(dest)
+        else:
+            dest = self.prepend(src)
+
         self.tarfile.add(src, arcname=dest)
 
     def add_string(self, content, dest):
+        dest = self.prepend(dest)
         tar_info = tarfile.TarInfo(name=dest)
         tar_info.size = len(content)
+        tar_info.mtime = time.time()
         self.tarfile.addfile(tar_info, StringIO(content))
 
     def close(self):
         self.tarfile.close()
 
 
-class ZipFileArchive(object):
+class ZipFileArchive(Archive):
 
     def __init__(self, name):
-        name = "%s.zip" % name
+        self._name = name
         try:
             import zlib
             compression = zipfile.ZIP_DEFLATED
         except:
             compression = zipfile.ZIP_STORED
 
-        self.zipfile = zipfile.ZipFile(name, mode="w")
+        self.zipfile = zipfile.ZipFile(self.name(), mode="w")
+
+    def name(self):
+        return "%s.zip" % self._name
 
     def add_file(self, src, dest=None):
         if os.path.isdir(src):
@@ -288,17 +312,18 @@ class ZipFileArchive(object):
                 for filename in filenames:
                     filename = path + filename
                     if dest:
-                        self.zipfile.write(filename, re.sub(regex, dest, filename))
+                        self.zipfile.write(filename,
+                                self.prepend(re.sub(regex, dest, filename)))
                     else:
-                        self.zipfile.write(filename)
+                        self.zipfile.write(filename, self.prepend(filename))
         else:
             if dest:
-                self.zipfile.write(src, dest)
+                self.zipfile.write(src, self.prepend(dest))
             else:
-                self.zipfile.write(src)
+                self.zipfile.write(src, self.prepend(src))
 
     def add_string(self, content, dest):
-        self.zipfile.writestr(dest, content)
+        self.zipfile.writestr(self.prepend(dest), content)
 
     def close(self):
         self.zipfile.close()

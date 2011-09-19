@@ -196,34 +196,18 @@ class Policy(object):
                 return False
         self.report_file = newName
 
-    def packageResults(self):
+    def packageResults(self, archive_filename):
+        print _("Creating compressed archive...")
+        self.report_file = archive_filename
+        # actually compress the archive if necessary
 
+    def getArchiveName(self):
         if len(self.ticketNumber):
             self.reportName = self.reportName + "." + self.ticketNumber
         else:
             self.reportName = self.reportName
 
-        curwd = os.getcwd()
-        os.chdir(os.path.dirname(self.cInfo['dstroot']))
-        oldmask = os.umask(077)
-
-        print _("Creating compressed archive...")
-
-        if os.path.isfile("/usr/bin/xz"):
-            self.report_file_ext = "tar.xz"
-            self.renameResults("sosreport-%s-%s.%s" % (self.reportName, time.strftime("%Y%m%d%H%M%S"), self.report_file_ext))
-            cmd = "/bin/tar -c %s | /usr/bin/xz -1 > %s" % (os.path.basename(self.cInfo['dstroot']),self.report_file)
-            sts = call(cmd, shell=True, bufsize=-1)
-        else:
-            self.report_file_ext = "tar.bz2"
-            self.renameResults("sosreport-%s-%s.%s" % (self.reportName, time.strftime("%Y%m%d%H%M%S"), self.report_file_ext))
-            tarcmd = "/bin/tar -jcf %s %s" % (self.report_file, os.path.basename(self.cInfo['dstroot']))
-            p = Popen(tarcmd, shell=True, stdout=PIPE, stderr=PIPE, bufsize=-1)
-            output = p.communicate()[0]
-
-        os.umask(oldmask)
-        os.chdir(curwd)
-        return
+        return "sosreport-%s-%s" % (self.reportName, time.strftime("%Y%m%d%H%M%S"))
 
     def cleanDstroot(self):
         if not os.path.isdir(os.path.join(self.cInfo['dstroot'],"sos_commands")):
@@ -269,10 +253,10 @@ class Policy(object):
         self.report_md5 = md5(fp.read()).hexdigest()
         fp.close()
 
-        self.renameResults("sosreport-%s-%s-%s.%s" % (self.reportName,
-                                                      time.strftime("%Y%m%d%H%M%S"),
-                                                      self.report_md5[-4:],
-                                                      self.report_file_ext))
+#        self.renameResults("sosreport-%s-%s-%s.%s" % (self.reportName,
+#                                                      time.strftime("%Y%m%d%H%M%S"),
+#                                                      self.report_md5[-4:],
+#                                                      self.report_file_ext))
 
         # store md5 into file
         fp = open(self.report_file + ".md5", "w")
@@ -397,5 +381,9 @@ class Policy(object):
     def check(self):
         "This method checks to see if we are running on RHEL. It returns True or False."
         return os.path.isfile('/etc/redhat-release')
+
+    def preferedArchive(self):
+        from sos.utilities import TarFileArchive
+        return TarFileArchive
 
 # vim: ts=4 sw=4 et

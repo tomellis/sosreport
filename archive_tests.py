@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import unittest
 import os
 import tarfile
@@ -25,31 +27,31 @@ class ZipFileArchiveTest(unittest.TestCase):
         self.zf.add_file('tests/worker.py')
         self.zf.close()
 
-        self.check_for_file('tests/worker.py')
+        self.check_for_file('test/tests/worker.py')
 
     def test_add_dir(self):
         self.zf.add_file('tests/')
         self.zf.close()
 
-        self.check_for_file('tests/worker.py')
+        self.check_for_file('test/tests/worker.py')
 
     def test_add_renamed(self):
         self.zf.add_file('tests/worker.py', dest='tests/worker_renamed.py')
         self.zf.close()
 
-        self.check_for_file('tests/worker_renamed.py')
+        self.check_for_file('test/tests/worker_renamed.py')
 
     def test_add_renamed_dir(self):
         self.zf.add_file('tests/', 'tests_renamed/')
         self.zf.close()
 
-        self.check_for_file('tests_renamed/worker.py')
+        self.check_for_file('test/tests_renamed/worker.py')
 
     def test_add_string(self):
         self.zf.add_string('this is content', 'tests/string_test.txt')
         self.zf.close()
 
-        self.check_for_file('tests/string_test.txt')
+        self.check_for_file('test/tests/string_test.txt')
 
 class TarFileArchiveTest(unittest.TestCase):
 
@@ -72,31 +74,31 @@ class TarFileArchiveTest(unittest.TestCase):
         self.tf.add_file('tests/worker.py')
         self.tf.close()
 
-        self.check_for_file('tests/worker.py')
+        self.check_for_file('test/tests/worker.py')
 
     def test_add_dir(self):
         self.tf.add_file('tests/')
         self.tf.close()
 
-        self.check_for_file('tests/worker.py')
+        self.check_for_file('test/tests/worker.py')
 
     def test_add_renamed(self):
         self.tf.add_file('tests/worker.py', dest='tests/worker_renamed.py')
         self.tf.close()
 
-        self.check_for_file('tests/worker_renamed.py')
+        self.check_for_file('test/tests/worker_renamed.py')
 
     def test_add_renamed_dir(self):
         self.tf.add_file('tests/', 'tests_renamed/')
         self.tf.close()
 
-        self.check_for_file('tests_renamed/worker.py')
+        self.check_for_file('test/tests_renamed/worker.py')
 
     def test_add_string(self):
         self.tf.add_string('this is content', 'tests/string_test.txt')
         self.tf.close()
 
-        self.check_for_file('tests/string_test.txt')
+        self.check_for_file('test/tests/string_test.txt')
 
 if __name__ == "__main__":
     unittest.main()

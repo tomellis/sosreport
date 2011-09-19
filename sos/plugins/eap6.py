@@ -6,6 +6,7 @@ import shlex
 import subprocess
 import string
 import grp, pwd
+import urllib2
 
 from sos.plugins import Plugin, IndependentPlugin
 from sos.utilities import DirTree, find, md5sum
@@ -31,7 +32,7 @@ class EAP6(Plugin, IndependentPlugin):
     __haveJava=False
     __twiddleCmd=None
     __jbossSystemJarDirs = [ "client", "lib" , "common/lib" ]
-    __jbossServerConfigDirs = ["all", "default", "minimal", "production", "standard", "web"]
+    __jbossServerConfigDirs = ["standalone", "domain"]
     __jbossHTMLBody=None
 
     def __alert(self, msg):
@@ -59,27 +60,7 @@ class EAP6(Plugin, IndependentPlugin):
               The JBoss SOS plug-in cannot continue.")
             return False
 
-        if os.path.exists(self.__jbossHome):
-            ## We need to set  JBOSS_CLASSPATH otherwise some twiddle commands will not work.
-            jbossClasspath=None
-            tmp=os.path.join(self.__jbossHome, "lib")
-            if os.path.exists(tmp):
-                jbossClasspath=tmp + os.sep + "*" + os.pathsep
-            else:
-                self.addAlert("WARN: The JBoss lib directory does not exist.  Dir(%s) " %  tmp)
-
-            tmp=os.path.join(self.__jbossHome, "common" , "lib")
-            if os.path.exists(tmp):
-                jbossClasspath+=tmp + os.sep + "*"
-            else:
-                self.addAlert("WARN: The JBoss lib directory does not exist.  Dir(%s) " %  tmp)
-
-            os.environ['JBOSS_CLASSPATH']=jbossClasspath
-
-            return True
-        else:
-            self.__alert("ERROR: The path to the JBoss installation directory does not exist.  Path is: " + self.__jbossHome)
-            return False
+        return True
 
     def __getJavaHome(self):
         """
@@ -154,29 +135,6 @@ class EAP6(Plugin, IndependentPlugin):
         if self.getOption("profile"):
             self.__jbossServerConfigDirs = self.getOptionAsList("profile")
 
-    def __buildTwiddleCmd(self):
-        """
-        Utility function to build the twiddle command with/without credentials
-        so that it can be used by later fcns.  If twiddle is found
-        """
-        ## In the off-chance that SOS is ever ported to cygwin or this plugin
-        ## is ported to win...
-        if platform.system() == "Windows":
-            self.__twiddleCmd=os.path.join(self.__jbossHome, "bin", "twiddle.bat")
-        else:
-            self.__twiddleCmd=os.path.join(self.__jbossHome, "bin", "twiddle.sh")
-
-        if os.path.exists(self.__twiddleCmd) and os.access(self.__twiddleCmd, os.X_OK):
-            credential = self.__getJMXCredentials()
-            if credential:
-                self.__twiddleCmd += credential
-        else:
-            ## Reset twiddlecmd to None
-            self.addAlert("ERROR: The twiddle program could not be found. Program=%s" % (self.__twiddleCmd))
-            self.__twiddleCmd = None
-
-        return
-
     def __createHTMLBodyStart(self):
         """
         The free-form HTML that can be inserted into the SOS report with addCustomText is within
@@ -226,13 +184,7 @@ class EAP6(Plugin, IndependentPlugin):
         """
 
     def __getMd5(self, file):
-        """
-        Will perform an MD5 sum on a given file and return the file's message digest.  This function
-        will not read the entire file into memory, instead, it will consume the file in 128 byte
-        chunks.  This might be slightly slower but, the intent of a SOS report is to collect data from
-        a system that could be under stress and we shouldn't stress it more by loading entire Jars into
-        real memory.
-        """
+        """Returns the MD5 sum of the specified file."""
 
         retVal = "?" * 32
 
@@ -372,193 +324,26 @@ class EAP6(Plugin, IndependentPlugin):
 
         return
 
-    def __getJBossHomeTree(self):
-        """
-        This function will execute the "tree" command on JBOSS_HOME.
-        """
-        self.__jbossHTMLBody += """
-    <br/>
-    <br/>
-    <div id="jboss-home-directory-tree" style="font-weight: bold;">&ndash; JBOSS_HOME Directory Tree</div>
-
-    <div>
-        &mdash; JBOSS_HOME Tree
-        ( <a href="javascript:show('jboss-home-tree')">Show</a> / <a
-            href="javascript:hide('jboss-home-tree')">Hide</a> ):
-    </div>
-    <div id="jboss-home-tree" style="overflow: hidden; display: none">
-    <pre>
-        """
+    def query_api(self, url, postdata=None):
         try:
-            output = DirTree(self.__jbossHome).as_string()
-            self.__jbossHTMLBody += """
-%s
-    </pre>
-    </div>
-        """ % (output)
-        except Exception, e:
-            self.__jbossHTMLBody += """
-    ERROR: Unable to generate <tt>tree</tt> on JBOSS_HOME.
-    Exception: %s
-    </pre>
-    </div>
-        """ % e
-        return
+            import json
+        except ImportError:
+            import simplejson as json
 
-    def __getMbeanData(self, dataTitle, divId, twiddleOpts):
-        credentials = ""
-        if self.__haveJava and self.__twiddleCmd:
-            self.__jbossHTMLBody += """
-    <div>
-        &mdash; %s
-        ( <a href="javascript:show('%s')">Show</a> / <a
-            href="javascript:hide('%s')">Hide</a> ):
-    </div>
-    <div id="%s" style="overflow: hidden; display: none">
-    <table style="margin-left: 30px;font-size:14px">
-        <tr>
-        <td align="left">
-            Twiddle Options:
-        </td>
-        <td align="left"><tt>%s</tt></td>
-        </tr>
-    </table>
-    <pre>
+        req = urllib2.Request("http://localhost:9990/management" + url, data=postdata)
+        resp = urllib2.urlopen(req)
+        return json.dumps(resp.read())
 
-        """ % (dataTitle, divId, divId, divId,twiddleOpts)
-            cmd = "%s %s" % (self.__twiddleCmd, twiddleOpts)
 
-            proc = subprocess.Popen(shlex.split(cmd), stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
-            output = proc.communicate()[0]
-            status = proc.returncode
-            if status == 0 and output:
-                self.__jbossHTMLBody += output.strip()
-            else:
-                self.__jbossHTMLBody += """
-        ERROR: Unable to collect %s data.
-            Output: %s
-            Status: %d
-            """ % (twiddleOpts, output, status)
-        else:
-            self.__jbossHTMLBody += "ERROR: Unable to collect data twiddle or Java is missing."
-
-        self.__jbossHTMLBody += """
-    </pre>
-    </div>
+    def get_online_data(self):
         """
-        return
-
-    def __getTwiddleData(self):
-        """
-        This function co-locates all of the calls to twiddle so that they can be easily disabled.
+        This function co-locates calls to the management api that gather
+        information from a running system.
         """
 
-        ## Get jboss.system.* Data
-        self.__jbossHTMLBody += """
-    <br/>
-    <br/>
-    <div id="jboss-system-mbean-data" style="font-weight: bold;">&ndash; JBoss JMX MBean Data from <tt>jboss.system:*</tt></div>
-        """
-        self.__getMbeanData("JBoss Server Info",
-                            "jboss-server-info",
-                            " get 'jboss.system:type=ServerInfo' ")
-        self.__getMbeanData("JBoss Server Config Info",
-                            "jboss-server-config-info",
-                            " get 'jboss.system:type=ServerConfig' ")
-        self.__getMbeanData("JBoss CXF Server Config Info",
-                            "jboss-cxfserver-config-info",
-                            " get 'jboss.ws:service=ServerConfig' ")
-        self.__getMbeanData("JBoss Memory Pool Info",
-                            "jboss-memory-pool-info",
-                            " invoke 'jboss.system:type=ServerInfo' listMemoryPools true ")
-        self.__getMbeanData("JBoss Thread CPU Utilization",
-                            "jboss-thread-cpu-info",
-                            " invoke 'jboss.system:type=ServerInfo' listThreadCpuUtilization ")
-        self.__getMbeanData("JBoss Thread Dump",
-                            "jboss-thread-dump",
-                            " invoke 'jboss.system:type=ServerInfo' listThreadDump ")
-        self.__getMbeanData("JBoss Logging Config Info",
-                            "jboss-logging-config-info",
-                            " get 'jboss.system:service=Logging,type=Log4jService' ")
-
-        ## Get jboss.* Data
-        self.__jbossHTMLBody += """
-    <br/>
-    <br/>
-    <div id="jboss-mbean-data" style="font-weight: bold;">&ndash; JBoss JMX MBean Data from <tt>jboss:*</tt></div>
-        """
-        self.__getMbeanData("JBoss System Properties",
-                            "jboss-system-properties-info",
-                            " invoke 'jboss:name=SystemProperties,type=Service' showAll ")
-
-        self.__getMbeanData("JBoss JNDI List View",
-                            "jboss-jndi-list-info",
-                            " invoke 'jboss:service=JNDIView' list true ")
-
-        ## MBean Summary
-        self.__jbossHTMLBody += """
-    <br/>
-    <br/>
-    <div id="jboss-mbean-summary" style="font-weight: bold;">&ndash; JBoss MBean Summary</div>
-        """
-        self.__getMbeanData("JBoss MBean Vendor/Version Info",
-                            "jboss-vendor-version",
-                            " get 'JMImplementation:type=MBeanServerDelegate' ")
-        self.__getMbeanData("JBoss MBean Count",
-                            "jboss-mbean-count",
-                            "  serverinfo -c ")
-        self.__getMbeanData("JBoss MBean List",
-                            "jboss-mbean-list",
-                            "  serverinfo -l ")
-
-        ##JBoss Messaging Data
-        self.__jbossHTMLBody += """
-    <br/>
-    <br/>
-    <div id="jboss-messaging" style="font-weight: bold;">&ndash; JBoss JMX Messaging MBean Data from <tt>jboss.messaging:*</tt></div>
-        """
-        self.__getMbeanData("JBoss Message Counters",
-                            "jboss-message-counters",
-                            " invoke 'jboss.messaging:service=ServerPeer' listMessageCountersAsHTML ")
-
-        self.__getMbeanData("JBoss Prepared Transactions Table",
-                            "jboss-prepared-transactions",
-                            " invoke 'jboss.messaging:service=ServerPeer' listAllPreparedTransactions ")
-
-        self.__getMbeanData("JBoss Active Clients Table",
-                            "jboss-active-clients",
-                            " invoke 'jboss.messaging:service=ServerPeer' showActiveClientsAsHTML ")
-
-        ## Get j2ee Data query 'jboss.j2ee:*'
-        self.__jbossHTMLBody += """
-    <br/>
-    <br/>
-    <div id="jboss-j2ee" style="font-weight: bold;">&ndash; JBoss JMX J2EE MBean Data from <tt>jboss.j2ee:*</tt></div>
-        """
-        self.__getMbeanData("JBoss J2EE MBeans",
-                            "jboss-j2ee-mbeans",
-                            " query 'jboss.j2ee:*' ")
-
-        ## VFS
-        self.__jbossHTMLBody += """
-    <br/>
-    <br/>
-    <div id="jboss-vfs" style="font-weight: bold;">&ndash; JBoss JMX VFS MBean Data from <tt>jboss.vfs:*</tt></div>
-        """
-        self.__getMbeanData("JBoss VFS Cached Contexts",
-                            "jboss-vfs-contexts",
-                            " invoke 'jboss.vfs:service=VFSCacheStatistics' listCachedContexts ")
-
-        ## Get jsr77 Data
-        self.__jbossHTMLBody += """
-    <br/>
-    <br/>
-    <div id="jboss-jsr77-data" style="font-weight: bold;">&ndash; JBoss JSR77 Data</div>
-        """
-        self.__getMbeanData("JBoss JSR77 Data",
-                            "jboss-jsr77",
-                            " jsr77 ")
-        return
+        self.addStringAsFile(
+                self.query_api("/core-service/platform-mbean/type/runtime"),
+                filename="runtime.txt")
 
 
     def __getFiles(self, configDirAry):
@@ -567,8 +352,8 @@ class EAP6(Plugin, IndependentPlugin):
         be collected are determined by options to this SOS plug-in.
         """
 
-        for dir in configDirAry:
-            path=os.path.join(self.__jbossHome, "server", dir)
+        for dir_ in configDirAry:
+            path = os.path.join(self.__jbossHome, dir_)
             ## First add forbidden files
             self.addForbiddenPath(os.path.join(path, "tmp"))
             self.addForbiddenPath(os.path.join(path, "work"))
@@ -576,25 +361,22 @@ class EAP6(Plugin, IndependentPlugin):
 
             if os.path.exists(path):
                 ## First get everything in the conf dir
-                confDir=os.path.join(path, "conf")
-                self.doCopyFileOrDir(confDir)
+                confDir = os.path.join(path, "configuration")
+
+                self.doCopyFileOrDir(confDir, sub=(self.__jbossHome, 'JBOSSHOME'))
                 ## Log dir next
-                logDir=os.path.join(path, "log")
+                logDir = os.path.join(path, "log")
 
                 for logFile in find("*", logDir):
-                    self.addCopySpecLimit(logFile, self.getOption("logsize"))
+                    self.addCopySpecLimit(logFile,
+                            self.getOption("logsize"),
+                            sub=(self.__jbossHome, 'JBOSSHOME'))
+
                 ## Deploy dir
-                deployDir=os.path.join(path, "deploy")
+                deployDir = os.path.join(path, "deployments")
 
                 for deployFile in find("*", deployDir, max_depth=1):
-                    self.addCopySpec(deployFile)
-
-                ## Get application deployment descriptors if designated.
-                if self.isOptionEnabled("appxml"):
-                    for app in self.getOptionAsList("appxml"):
-                        pat = os.path.join("*%s*" % (app,), "WEB-INF")
-                        for file in find("*.xml", deployDir, path_pattern=pat):
-                            self.addCopySpec(file)
+                    self.addCopySpec(deployFile, sub=(self.__jbossHome, 'JBOSSHOME'))
 
     def setup(self):
 
@@ -603,32 +385,35 @@ class EAP6(Plugin, IndependentPlugin):
         if not self.__getJbossHome():
             self.exit_please()
 
+        self.get_online_data()
+
         ## Check to see if the user passed in a limited list of server config jars.
-        self.__updateServerConfigDirs()
+#        self.__updateServerConfigDirs()
 
         ## Generate HTML Body for report
-        self.__createHTMLBodyStart()
+#        self.__createHTMLBodyStart()
 
         ## Generate hashes of the stock Jar files for the report.
-        if self.getOption("stdjar"):
-            self.__getStdJarInfo()
+#        if self.getOption("stdjar"):
+#            self.__getStdJarInfo()
 
         ## Generate hashes for the Jars in the various profiles
-        if self.getOption("servjar"):
-            self.__getServerConfigJarInfo(self.__jbossServerConfigDirs)
+#        if self.getOption("servjar"):
+#            self.__getServerConfigJarInfo(self.__jbossServerConfigDirs)
 
         ## Generate a Tree for JBOSS_HOME
-        self.__getJBossHomeTree()
+        tree = DirTree(self.__jbossHome).as_string()
+        self.addStringAsFile(tree, "jboss_home_tree.txt")
 
-        if self.getOption("twiddle"):
+#        if self.getOption("twiddle"):
             ## We need to know where Java is installed or at least ensure that it
             ## is available to the plug-in so that we can run twiddle.
-            self.__haveJava = self.__getJavaHome()
-            self.__buildTwiddleCmd()
-            self.__getTwiddleData()
+#            self.__haveJava = self.__getJavaHome()
+#            self.__buildTwiddleCmd()
+#            self.__getTwiddleData()
 
 
-        self.addCustomText(self.__jbossHTMLBody)
+#        self.addCustomText(self.__jbossHTMLBody)
 
         self.__getFiles(self.__jbossServerConfigDirs)
 
@@ -637,22 +422,22 @@ class EAP6(Plugin, IndependentPlugin):
         Obfuscate passwords.
         """
 
-        for dir in self.__jbossServerConfigDirs:
-            path=os.path.join(self.__jbossHome, "server", dir)
+#        for dir in self.__jbossServerConfigDirs:
+#            path=os.path.join(self.__jbossHome, "server", dir)
 
-            self.doRegexSub(os.path.join(path,"conf","login-config.xml"),
-                            re.compile(r'"password".*>.*</module-option>', re.IGNORECASE),
-                            r'"password">********</module-option>')
+#            self.doRegexSub(os.path.join(path,"conf","login-config.xml"),
+#                            re.compile(r'"password".*>.*</module-option>', re.IGNORECASE),
+#                            r'"password">********</module-option>')
 
-            tmp = os.path.join(path,"conf", "props")
-            for propFile in find("*-users.properties", tmp):
-                self.doRegexSub(propFile,
-                                r"=(.*)",
-                                r'=********')
+#            tmp = os.path.join(path,"conf", "props")
+#            for propFile in find("*-users.properties", tmp):
+#                self.doRegexSub(propFile,
+#                                r"=(.*)",
+#                                r'=********')
 
-            ## Remove PW from -ds.xml files
-            tmp=os.path.join(path, "deploy")
-            for dsFile in find("*-ds.xml", tmp):
-                self.doRegexSub(dsFile,
-                                re.compile(r"<password.*>.*</password.*>", re.IGNORECASE),
-                                r"<password>********</password>")
+            # Remove PW from -ds.xml files
+#            tmp=os.path.join(path, "deploy")
+#            for dsFile in find("*-ds.xml", tmp):
+#                self.doRegexSub(dsFile,
+#                                re.compile(r"<password.*>.*</password.*>", re.IGNORECASE),
+#                                r"<password>********</password>")
