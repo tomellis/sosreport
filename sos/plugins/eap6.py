@@ -1,4 +1,5 @@
 import os
+import re
 import zipfile
 import platform
 import fnmatch
@@ -22,6 +23,8 @@ class EAP6(Plugin, IndependentPlugin):
           ("logsize", 'max size (MiB) to collect per log file', '', 15),
           ("stdjar",  'Collect jar statistics for standard jars.', '', True),
           ("address", 'hostname:port of the management api for jboss', '', 'localhost:9990'),
+          ("user", 'username for management console', '', None),
+          ("pass", 'password for management console', '', None),
           ("appxml",  "comma separated list of application's whose XML descriptors you want. The keyword 'all' will collect all descriptors in the designated profile(s).", '', False),
     ]
 
@@ -33,7 +36,7 @@ class EAP6(Plugin, IndependentPlugin):
     __jbossHTMLBody=None
 
     def __alert(self, msg):
-        print msg
+        self.soslog.error(msg)
         self.addAlert(msg)
 
     def __getJbossHome(self):
@@ -58,24 +61,6 @@ class EAP6(Plugin, IndependentPlugin):
             return False
 
         return True
-
-    def __getJMXCredentials(self):
-        """
-        Read the JMX credentials from the option list.
-        Returns:
-            A formatted credential string for twiddle consumption if both user and pass
-            are supplied.  None otherwise.
-        """
-        credential = None
-        ## Let's make a best effort not to pass expansions or escapes to the shell
-        ## by strong quoting the user's input
-        if self.getOption("user"):
-            credential=" -u '" + self.getOption("user") + "' "
-            if self.getOption("pass"):
-                credential+=" -p '" + self.getOption("pass") + "' "
-            else:
-                credential=None
-        return credential
 
     def __getMd5(self, file):
         """Returns the MD5 sum of the specified file."""
@@ -133,10 +118,23 @@ class EAP6(Plugin, IndependentPlugin):
             import simplejson as json
 
         host_port = self.getOption('address')
+        username = self.getOption('user')
+        password = self.getOption('pass')
+        uri = "http://" + host_port + "/management" + url
 
-        req = urllib2.Request("http://" + host_port + "/management" + url, data=postdata)
-        resp = urllib2.urlopen(req)
-        return json.dumps(resp.read())
+        opener = urllib2.build_opener()
+
+        if username and password:
+            auth_opener = urllib2.HTTPDigestAuthHandler()
+            auth_opener.add_password(realm="PropertiesMgmtSecurityRealm",
+                                     uri=uri,
+                                     user=username,
+                                     passwd=password)
+            opener.add_handler(auth_opener)
+
+        req = urllib2.Request(uri, data=postdata)
+        resp = opener.open(req)
+        return json.loads(resp.read())
 
 
     def get_online_data(self):
@@ -144,9 +142,9 @@ class EAP6(Plugin, IndependentPlugin):
         This function co-locates calls to the management api that gather
         information from a running system.
         """
-
+        import pprint
         self.addStringAsFile(
-                self.query_api("/core-service/platform-mbean/type/runtime"),
+                pprint.pformat(self.query_api("/core-service/platform-mbean/type/runtime")),
                 filename="runtime.txt")
 
 
@@ -203,27 +201,28 @@ class EAP6(Plugin, IndependentPlugin):
 
         self.__getFiles(self.__jbossServerConfigDirs)
 
+    # FIXME: this is still not right, tweak the search paths to pick up the right files
     def postproc(self):
         """
         Obfuscate passwords.
         """
 
-#        for dir in self.__jbossServerConfigDirs:
-#            path=os.path.join(self.__jbossHome, "server", dir)
+        for dir_ in self.__jbossServerConfigDirs:
+            path = os.path.join(self.__jbossHome, dir_)
 
-#            self.doRegexSub(os.path.join(path,"conf","login-config.xml"),
-#                            re.compile(r'"password".*>.*</module-option>', re.IGNORECASE),
-#                            r'"password">********</module-option>')
+            self.doRegexSub(os.path.join(path,"configuration","login-config.xml"),
+                            re.compile(r'"password".*>.*</module-option>', re.IGNORECASE),
+                            r'"password">********</module-option>')
 
-#            tmp = os.path.join(path,"conf", "props")
-#            for propFile in find("*-users.properties", tmp):
-#                self.doRegexSub(propFile,
-#                                r"=(.*)",
-#                                r'=********')
+            tmp = os.path.join(path,"conf", "props")
+            for propFile in find("*-users.properties", tmp):
+                self.doRegexSub(propFile,
+                                r"=(.*)",
+                                r'=********')
 
-            # Remove PW from -ds.xml files
-#            tmp=os.path.join(path, "deploy")
-#            for dsFile in find("*-ds.xml", tmp):
-#                self.doRegexSub(dsFile,
-#                                re.compile(r"<password.*>.*</password.*>", re.IGNORECASE),
-#                                r"<password>********</password>")
+#             Remove PW from -ds.xml files
+            tmp = os.path.join(path, "deploy")
+            for dsFile in find("*-ds.xml", tmp):
+                self.doRegexSub(dsFile,
+                                re.compile(r"<password.*>.*</password.*>", re.IGNORECASE),
+                                r"<password>********</password>")

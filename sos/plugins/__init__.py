@@ -141,6 +141,8 @@ class Plugin(object):
         '''
         try:
             path = self._get_dest_for_srcpath(srcpath)
+            if not path:
+                return 0
             readable = self.archive.open_file(path)
             result, replacements = re.subn(regexp, subst, readable.read())
             if replacements:

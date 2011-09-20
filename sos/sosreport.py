@@ -117,15 +117,9 @@ def parse_options(opts):
     parser.add_option("-u", "--upload", action="store",
                          dest="upload", default=False,
                          help="upload the report to an ftp server")
-    #parser.add_option("--encrypt", action="store_true",
-    #                     dest="encrypt", default=False,
-    #                     help="encrypt with GPG using Red Hat support's public key")
     parser.add_option("--batch", action="store_true",
                          dest="batch", default=False,
                          help="do not ask any question (batch mode)")
-    parser.add_option("--build", action="store_true",
-                         dest="build", default=False,
-                         help="keep sos tree available and dont package results")
     parser.add_option("--no-colors", action="store_true",
                          dest="nocolors", default=False,
                          help="do not use terminal colors for text")
@@ -290,7 +284,7 @@ No changes will be made to your system.
         print "\n%s\n" % _("sosreport (version %s)" % (__version__,))
 
     def get_commons(self):
-        return {'dstroot': self.dstroot,
+        return {
                 'cmddir': self.cmddir,
                 'logdir': self.logdir,
                 'rptdir': self.rptdir,
@@ -299,7 +293,8 @@ No changes will be made to your system.
                 'verbosity': self.opts.verbosity,
                 'xmlreport': self.xml_report,
                 'cmdlineopts': self.opts,
-                'config': self.config}
+                'config': self.config
+                }
 
     def _set_archive(self):
         archive_name = os.path.join(self.opts.tmp_dir,self.policy.getArchiveName())
@@ -312,11 +307,6 @@ No changes will be made to your system.
             self.archive = TarFileArchive(archive_name)
 
     def _set_directories(self):
-        self.dstroot = self.policy.getDstroot(self.opts.tmp_dir)
-        if not self.dstroot:
-            print _("Could not create temporary directory.")
-            self._exit()
-
         self.cmddir = 'sos_commands'
         self.logdir = 'sos_logs'
         self.rptdir = 'sos_reports'
@@ -344,10 +334,7 @@ No changes will be made to your system.
             pdb.pm()
 
     def _exit(self, error=0):
-        try:
-            self.policy.cleanDstroot()
-        finally:
-            sys.exit(error)
+        sys.exit(error)
 
     def _exit_nice(self):
         for plugname, plugin in self.loaded_plugins:
@@ -799,21 +786,8 @@ No changes will be made to your system.
 
     def final_work(self):
 
-        if self.opts.build:
-            print
-            print _("  sosreport build tree is located at : %s" % (self.dstroot,))
-            print
-            sys.exit(0)
-
         # package up the results for the support organization
         self.policy.packageResults(self.archive.name())
-
-        # delete gathered files
-        self.policy.cleanDstroot()
-
-        # let's encrypt the tar-ball
-        #if self.__cmdLineOpts__.encrypt:
-        #   policy.encryptResults()
 
         # automated submission will go here
         if not self.opts.upload:

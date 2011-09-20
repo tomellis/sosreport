@@ -144,18 +144,6 @@ class Policy(object):
         name = "-".join(fields[:-3])
         return (name, version, release, arch)
 
-    def getDstroot(self, tmpdir='/tmp'):
-        """Find a temp directory to form the root for our gathered information
-           and reports.
-        """
-        uniqname = "%s-%s" % (self.hostName(), time.strftime("%Y%m%d%H%M%s"))
-        dstroot = os.path.join(os.path.abspath(tmpdir),uniqname)
-        try:
-            os.makedirs(dstroot, 0700)
-        except:
-            return False
-        return dstroot
-
     def preWork(self):
         # this method will be called before the gathering begins
 
@@ -187,14 +175,6 @@ class Policy(object):
 
         return
 
-    def renameResults(self, newName):
-        newName = os.path.join(os.path.dirname(self.cInfo['dstroot']), newName)
-        if len(self.report_file) and os.path.isfile(self.report_file):
-            try:
-                os.rename(self.report_file, newName)
-            except:
-                return False
-        self.report_file = newName
 
     def packageResults(self, archive_filename):
         print _("Creating compressed archive...")
@@ -209,11 +189,6 @@ class Policy(object):
 
         return "sosreport-%s-%s" % (self.reportName, time.strftime("%Y%m%d%H%M%S"))
 
-    def cleanDstroot(self):
-        if not os.path.isdir(os.path.join(self.cInfo['dstroot'],"sos_commands")):
-            # doesn't look like a dstroot, refusing to clean
-            return False
-        os.system("/bin/rm -rf %s" % self.cInfo['dstroot'])
 
     def encryptResults(self):
         # make sure a report exists
@@ -252,11 +227,6 @@ class Policy(object):
         fp = open(self.report_file, "r")
         self.report_md5 = md5(fp.read()).hexdigest()
         fp.close()
-
-#        self.renameResults("sosreport-%s-%s-%s.%s" % (self.reportName,
-#                                                      time.strftime("%Y%m%d%H%M%S"),
-#                                                      self.report_md5[-4:],
-#                                                      self.report_file_ext))
 
         # store md5 into file
         fp = open(self.report_file + ".md5", "w")

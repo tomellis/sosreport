@@ -258,8 +258,9 @@ class Archive(object):
     _name = "unset"
 
     def prepend(self, src):
-        name = os.path.split(self._name)[-1]
-        return os.path.join(name, src.lstrip(os.sep))
+        if src:
+            name = os.path.split(self._name)[-1]
+            return os.path.join(name, src.lstrip(os.sep))
 
 
 class TarFileArchive(Archive):
@@ -287,14 +288,16 @@ class TarFileArchive(Archive):
         self.tarfile.addfile(tar_info, StringIO(content))
 
     def open_file(self, name):
-        self.tarfile.close()
-        self.tarfile = tarfile.open(self.name(), mode="r")
-        name = self.prepend(name)
-        file_obj = self.tarfile.extractfile(name)
-        file_obj = StringIO(file_obj.read())
-        self.tarfile.close()
-        self.tarfile = tarfile.open(self.name(), mode="a")
-        return file_obj
+        try:
+            self.tarfile.close()
+            self.tarfile = tarfile.open(self.name(), mode="r")
+            name = self.prepend(name)
+            file_obj = self.tarfile.extractfile(name)
+            file_obj = StringIO(file_obj.read())
+            return file_obj
+        finally:
+            self.tarfile.close()
+            self.tarfile = tarfile.open(self.name(), mode="a")
 
     def close(self):
         self.tarfile.close()
@@ -338,13 +341,15 @@ class ZipFileArchive(Archive):
         self.zipfile.writestr(self.prepend(dest), content)
 
     def open_file(self, name):
-        self.zipfile.close()
-        self.zipfile = zipfile.ZipFile(self.name(), mode="r")
-        name = self.prepend(name)
-        file_obj = self.zipfile.open(name)
-        self.zipfile.close()
-        self.zipfile = zipfile.ZipFile(self.name(), mode="a")
-        return file_obj
+        try:
+            self.zipfile.close()
+            self.zipfile = zipfile.ZipFile(self.name(), mode="r")
+            name = self.prepend(name)
+            file_obj = self.zipfile.open(name)
+            return file_obj
+        finally:
+            self.zipfile.close()
+            self.zipfile = zipfile.ZipFile(self.name(), mode="a")
 
     def close(self):
         self.zipfile.close()
