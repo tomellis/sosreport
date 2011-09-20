@@ -130,45 +130,26 @@ class Plugin(object):
         '''
         return (self.policy().pkgByName(package_name) is not None)
 
-    def getCopiedFilePaths(self, srcpath):
-        """Generator function that returns the absolute path
-        of every copied file that is equal to srcpath."""
-        for afile in self.copiedFiles:
-            if afile['srcpath'] == srcpath:
-                yield os.path.join(self.cInfo['dstroot'],
-                                   srcpath.lstrip(os.path.sep))
-
-    def getCopiedFilePath(self, srcpath):
-        """Returns the absolute path of the first copied file that matches
-           srcpath. Returns None if no matchng path is found."""
-        try:
-            return list(self.getCopiedFilePaths(srcpath))[0]
-        except Exception:
-            return None
-
-    # Method for applying regexp substitutions
     def doRegexSub(self, srcpath, regexp, subst):
         '''Apply a regexp substitution to a file archived by sosreport.
+        srcpath is the path in the archive where the file can be found.
+        regexp can be a regexp string or a compiled re object.
+        subst is a string to replace each occurance of regexp in the content
+        of srcpath.
+
+        This function returns the number of replacements made.
         '''
-        if len(self.copiedFiles):
-            for abspath in self.getCopiedFilePaths(srcpath):
-                try:
-                    fp = open(abspath, 'r')
-                    tmpout, occurs = re.subn( regexp, subst, fp.read() )
-                    fp.close()
-                    if occurs > 0:
-                       fp = open(abspath,'w')
-                       fp.write(tmpout)
-                       fp.close()
-                       return occurs
-                except SystemExit:
-                  raise SystemExit
-                except KeyboardInterrupt:
-                  raise KeyboardInterrupt
-                except Exception, e:
-                    # self.soslog.debug("problem at path %s (%s)" % (abspath,e))
-                    break
-        return False
+        try:
+            path = self._get_dest_for_srcpath(srcpath)
+            readable = self.archive.open_file(path)
+            result, replacements = re.subn(regexp, subst, readable.read())
+            if replacements:
+                self.archive.add_string(result, srcpath)
+                return replacements
+            else:
+                return 0
+        except Exception:
+            return 0
 
     def doRegexFindAll(self, regex, fname):
         ''' Return a list of all non overlapping matches in the string(s)
@@ -200,6 +181,12 @@ class Plugin(object):
                 'dstpath':srcpath,
                 'symlink':"yes",
                 'pointsto':link})
+
+    def _get_dest_for_srcpath(self, srcpath):
+        for copied in self.copiedFiles:
+            if srcpath == copied["srcpath"]:
+                return copied["dstpath"]
+        return None
 
     # Methods for copying files and shelling out
     def doCopyFileOrDir(self, srcpath, dest=None, sub=None):

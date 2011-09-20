@@ -53,6 +53,19 @@ class ZipFileArchiveTest(unittest.TestCase):
 
         self.check_for_file('test/tests/string_test.txt')
 
+    def test_get_file(self):
+        self.zf.add_string('this is my content', 'tests/string_test.txt')
+
+        afp = self.zf.open_file('tests/string_test.txt')
+        self.assertEquals('this is my content', afp.read())
+
+    def test_overwrite_file(self):
+        self.zf.add_string('this is my content', 'tests/string_test.txt')
+        self.zf.add_string('this is my new content', 'tests/string_test.txt')
+
+        afp = self.zf.open_file('tests/string_test.txt')
+        self.assertEquals('this is my new content', afp.read())
+
 class TarFileArchiveTest(unittest.TestCase):
 
     def setUp(self):
@@ -99,6 +112,19 @@ class TarFileArchiveTest(unittest.TestCase):
         self.tf.close()
 
         self.check_for_file('test/tests/string_test.txt')
+
+    def test_get_file(self):
+        self.tf.add_string('this is my content', 'tests/string_test.txt')
+
+        afp = self.tf.open_file('tests/string_test.txt')
+        self.assertEquals('this is my content', afp.read())
+
+    def test_overwrite_file(self):
+        self.tf.add_string('this is my content', 'tests/string_test.txt')
+        self.tf.add_string('this is my new content', 'tests/string_test.txt')
+
+        afp = self.tf.open_file('tests/string_test.txt')
+        self.assertEquals('this is my new content', afp.read())
 
 if __name__ == "__main__":
     unittest.main()

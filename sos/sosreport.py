@@ -146,7 +146,7 @@ def parse_options(opts):
                          help="specify alternate configuration file")
     parser.add_option("--tmp-dir", action="store",
                          dest="tmp_dir",
-                         help="specify alternate temporary directory", default="/tmp")
+                         help="specify alternate temporary directory", default=tempfile.gettempdir())
     parser.add_option("--diagnose", action="store_true",
                          dest="diagnose",
                          help="enable diagnostics", default=False)
@@ -241,9 +241,11 @@ class XmlReport(object):
         if not self.enabled:
             return
 
-        outfn = open(fname,"w")
-        outfn.write(self.doc.serialize(None, 1))
-        outfn.close()
+        outf = tempfile.NamedTemporaryFile()
+        outf.write(self.doc.serialize(None, 1))
+        outf.flush()
+        self.archive.add_file(outf.name, dest=fname)
+        outf.close()
 
 
 class SoSReport(object):
@@ -299,8 +301,8 @@ No changes will be made to your system.
                 'cmdlineopts': self.opts,
                 'config': self.config}
 
-    def _set_archive(self, base_dir=tempfile.gettempdir()):
-        archive_name = os.path.join(base_dir,self.policy.getArchiveName())
+    def _set_archive(self):
+        archive_name = os.path.join(self.opts.tmp_dir,self.policy.getArchiveName())
         if self.opts.compression_type == 'auto':
             auto_archive = self.policy.preferedArchive()
             self.archive = auto_archive(archive_name)
@@ -726,7 +728,7 @@ No changes will be made to your system.
 
     def html_report(self):
         # Generate the header for the html output file
-        rfd = open(os.path.join(self.rptdir, "sosreport.html"), "w")
+        rfd = tempfile.NamedTemporaryFile()
         rfd.write("""
         <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
         <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
@@ -782,6 +784,9 @@ No changes will be made to your system.
 
         rfd.write("</body></html>")
 
+        rfd.flush()
+
+        self.archive.add_file(rfd.name, dest=os.path.join('sos_reports', 'sos.html'))
         rfd.close()
 
     def postproc(self):

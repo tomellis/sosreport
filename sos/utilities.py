@@ -52,7 +52,6 @@ def md5sum(filename, chunk_size=128):
         data = fd.read(chunk_size)
     return md5_obj.hexdigest()
 
-
 class DirTree(object):
     """Builds an ascii representation of a directory structure"""
 
@@ -98,12 +97,13 @@ class DirTree(object):
                 "group": grp.getgrgid(stats.st_gid)[0],
                 "filesize": self._convert_bytes(stats.st_size),
                 }
-        return "[%(user)s %(group)s %(filesize)s] %(filename)s" % details
+        return ("[%(user)s %(group)s %(filesize)s] " % details, "%(filename)s" % details)
 
-    def tree_i(self, dir_, padding='', first=False):
+    def tree_i(self, dir_, padding='', first=False, fmt="%-30s %s%s%s"):
         if not first:
-            self.buf(padding[:-1] +
-                "+-- " + self._format(os.path.abspath(dir_)))
+            details, filename = self._format(os.path.abspath(dir_))
+            line = fmt % (details, padding[:-1], "+-- ", filename)
+            self.buf(line)
             padding += '   '
 
         count = 0
@@ -117,7 +117,9 @@ class DirTree(object):
                 pass
             elif os.path.isfile(path):
                 self.file_count += 1
-                self.buf(padding + '+-- ' + self._format(path))
+                details, filename = self._format(path)
+                line = fmt % (details, padding, "+-- ", filename)
+                self.buf(line)
             elif os.path.islink(path):
                 self.buf(padding +
                          '+-- ' +
@@ -201,9 +203,9 @@ class ImporterHelper(object):
         return []
 
 def find(file_pattern, top_dir, max_depth=None, path_pattern=None):
-    """generate function to find files recursively. Usage:
+    """generator function to find files recursively. Usage:
 
-    for filename in find("*.properties", /var/log/foobar):
+    for filename in find("*.properties", "/var/log/foobar"):
         print filename
     """
     if max_depth:
@@ -221,7 +223,7 @@ def find(file_pattern, top_dir, max_depth=None, path_pattern=None):
             yield os.path.join(path, name)
 
 
-def sosGetCommandOutput(command, timeout = 300):
+def sosGetCommandOutput(command, timeout=300):
     """ Execute a command and gather stdin, stdout, and return status.
     """
     # soslog = logging.getLogger('sos')
@@ -284,6 +286,16 @@ class TarFileArchive(Archive):
         tar_info.mtime = time.time()
         self.tarfile.addfile(tar_info, StringIO(content))
 
+    def open_file(self, name):
+        self.tarfile.close()
+        self.tarfile = tarfile.open(self.name(), mode="r")
+        name = self.prepend(name)
+        file_obj = self.tarfile.extractfile(name)
+        file_obj = StringIO(file_obj.read())
+        self.tarfile.close()
+        self.tarfile = tarfile.open(self.name(), mode="a")
+        return file_obj
+
     def close(self):
         self.tarfile.close()
 
@@ -325,15 +337,16 @@ class ZipFileArchive(Archive):
     def add_string(self, content, dest):
         self.zipfile.writestr(self.prepend(dest), content)
 
+    def open_file(self, name):
+        self.zipfile.close()
+        self.zipfile = zipfile.ZipFile(self.name(), mode="r")
+        name = self.prepend(name)
+        file_obj = self.zipfile.open(name)
+        self.zipfile.close()
+        self.zipfile = zipfile.ZipFile(self.name(), mode="a")
+        return file_obj
+
     def close(self):
         self.zipfile.close()
-
-
-
-
-
-
-
-
 
 # vim:ts=4 sw=4 et
