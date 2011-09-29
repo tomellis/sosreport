@@ -16,26 +16,27 @@
 ## along with this program; if not, write to the Free Software
 ## Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-# This enables the use of with syntax in python 2.5 (aka jython)
+# This enables the use of with syntax in python 2.5 (e.g. jython)
 from __future__ import with_statement
 
 import os
 import sys
-import string
 from tempfile import gettempdir
 import random
 import re
 import platform
-try:
-    from hashlib import md5
-except ImportError:
-    from md5 import md5
 import time
 from subprocess import Popen, PIPE, call
 from collections import deque
 
+try:
+    from hashlib import md5
+except ImportError:
+    from md5 import md5
+
 from sos import _sos as _
 from sos.plugins import RedHatPlugin, IndependentPlugin
+from sos.policies import Policy, PackageManager
 
 sys.path.insert(0, "/usr/share/rhn/")
 try:
@@ -47,7 +48,45 @@ except:
     pass
 
 
-class Policy(object):
+class RHELPackageManager(PackageManager):
+
+    def _get_rpm_list(self):
+        pkg_list = subprocess.Popen(["rpm", "-qa", "--queryformat", "%{NAME}|%{VERSION}\\n"],
+            stdout=subprocess.PIPE).communicate()[0].splitlines()
+        self._rpms = {}
+        for pkg in pkg_list:
+            name, version = pkg.split("|")
+            self._rpms[name] = {
+                    'name': name,
+                    'version': version
+                    }
+
+    def allPkgsByName(self, name):
+        return fnmatch.filter(self.allPkgs().keys(), name)
+
+    def allPkgsByNameRegex(self, regex_name, flags=None):
+        reg = re.compile(regex_name, flags)
+        return [pkg for pkg in self.allPkgs().keys() if reg.match(pkg)]
+
+    def pkgByName(self, name):
+        try:
+            self.AllPkgsByName(name)[-1]
+        except Exception:
+            return None
+
+    def allPkgs(self):
+        if not self._rpms:
+            self._rpms = self._get_rpm_list()
+        return self._rpms
+
+    def pkgNVRA(self, pkg):
+        fields = pkg.split("-")
+        version, release, arch = fields[-3:]
+        name = "-".join(fields[:-3])
+        return (name, version, release, arch)
+
+
+class RHELPolicy(Policy):
 
     def __init__(self):
         self.report_file = ""
@@ -56,10 +95,22 @@ class Policy(object):
         self.reportName = ""
         self.ticketNumber = ""
         self._parse_uname()
+        self.package_manager = RHELPackageManager()
 
     def setCommons(self, commons):
         self.cInfo = commons
-        return
+
+    def validatePlugin(self, plugin_class):
+        "Checks that the plugin will execute given the environment"
+        return issubclass(plugin_class, RedHatPlugin) or issubclass(plugin_class, IndependentPlugin)
+
+    def check(self):
+        "This method checks to see if we are running on RHEL. It returns True or False."
+        return os.path.isfile('/etc/redhat-release')
+
+    def preferedArchive(self):
+        from sos.utilities import TarFileArchive
+        return TarFileArchive
 
     def _parse_uname(self):
         (system, node, release,
@@ -120,7 +171,8 @@ class Policy(object):
                 return 5
             elif pkgname[0] == "6":
                 return 6
-        except: pass
+        except:
+            pass
         return False
 
     def rhnUsername(self):
@@ -137,12 +189,6 @@ class Policy(object):
 
     def getArch(self):
         return self.machine
-
-    def pkgNVRA(self, pkg):
-        fields = pkg.split("-")
-        version, release, arch = fields[-3:]
-        name = "-".join(fields[:-3])
-        return (name, version, release, arch)
 
     def preWork(self):
         # this method will be called before the gathering begins
@@ -175,7 +221,6 @@ class Policy(object):
 
         return
 
-
     def packageResults(self, archive_filename):
         print _("Creating compressed archive...")
         self.report_file = archive_filename
@@ -188,7 +233,6 @@ class Policy(object):
             self.reportName = self.reportName
 
         return "sosreport-%s-%s" % (self.reportName, time.strftime("%Y%m%d%H%M%S"))
-
 
     def encryptResults(self):
         # make sure a report exists
@@ -314,46 +358,5 @@ class Policy(object):
             print
 
         fp.close()
-
-    def _get_rpm_list(self):
-        pkg_list = subprocess.Popen(["rpm", "-qa", "--queryformat", "%{NAME}|%{VERSION}\\n"],
-            stdout=subprocess.PIPE).communicate()[0].splitlines()
-        self._rpms = {}
-        for pkg in pkg_list:
-            name, version = pkg.split("|")
-            self._rpms[name] = {
-                    'name': name,
-                    'version': version
-                    }
-
-    def allPkgsByName(self, name):
-        return fnmatch.filter(self.allPkgs().keys(), name)
-
-    def allPkgsByNameRegex(self, regex_name, flags=None):
-        reg = re.compile(regex_name, flags)
-        return [pkg for pkg in self.allPkgs().keys() if reg.match(pkg)]
-
-    def pkgByName(self, name):
-        try:
-            self.AllPkgsByName(name)[-1]
-        except Exception:
-            return None
-
-    def allPkgs(self):
-        if not self._rpms:
-            self._rpms = self._get_rpm_list()
-        return self._rpms
-
-    def validatePlugin(self, plugin_class):
-        "Checks that the plugin will execute given the environment"
-        return issubclass(plugin_class, RedHatPlugin) or issubclass(plugin_class, IndependentPlugin)
-
-    def check(self):
-        "This method checks to see if we are running on RHEL. It returns True or False."
-        return os.path.isfile('/etc/redhat-release')
-
-    def preferedArchive(self):
-        from sos.utilities import TarFileArchive
-        return TarFileArchive
 
 # vim: ts=4 sw=4 et

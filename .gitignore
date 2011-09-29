@@ -2,3 +2,5 @@
 *swp*
 *.pyc
 *.sw*
+tags
+buildjar/

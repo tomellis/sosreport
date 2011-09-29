@@ -111,7 +111,20 @@ class EAP6(Plugin, IndependentPlugin):
         else:
             self.addAlert("WARN: No jars found in JBoss system path (" + path + ").")
 
-    def query_api(self, url, postdata=None):
+    def query_api(self, url):
+        try:
+            return self.query_java(url)
+        except Exception, e:
+            return self.query_http(url)
+
+    def query_java(self, url):
+        try:
+            raise Exception
+        except Exception, e:
+            pass
+            # throw exception to do http stuff
+
+    def query_http(self, url, postdata=None):
         try:
             import json
         except ImportError:
@@ -125,16 +138,27 @@ class EAP6(Plugin, IndependentPlugin):
         opener = urllib2.build_opener()
 
         if username and password:
-            auth_opener = urllib2.HTTPDigestAuthHandler()
-            auth_opener.add_password(realm="PropertiesMgmtSecurityRealm",
-                                     uri=uri,
-                                     user=username,
-                                     passwd=password)
-            opener.add_handler(auth_opener)
+            params = {"realm": "PropertiesMgmtSecurityRealm",
+                    "uri": uri,
+                    "user": username,
+                    "passwd": password}
+
+            digest_auth_handler = urllib2.HTTPDigestAuthHandler()
+            digest_auth_handler.add_password(**params)
+
+            basic_auth_handler = urllib2.HTTPBasicAuthHandler()
+            basic_auth_handler.add_password(**params)
+
+            opener.add_handler(digest_auth_handler)
+            opener.add_handler(basic_auth_handler)
 
         req = urllib2.Request(uri, data=postdata)
-        resp = opener.open(req)
-        return json.loads(resp.read())
+
+        try:
+            resp = opener.open(req)
+            return json.loads(resp.read())
+        except Exception, e:
+            self.addAlert("Could not query url: %s; error: %s" % (uri, e))
 
 
     def get_online_data(self):
@@ -143,9 +167,11 @@ class EAP6(Plugin, IndependentPlugin):
         information from a running system.
         """
         import pprint
-        self.addStringAsFile(
-                pprint.pformat(self.query_api("/core-service/platform-mbean/type/runtime")),
-                filename="runtime.txt")
+
+        for url, outfile in [
+                ("/core-service/platform-mbean/type/runtime", "runtime.txt"),
+                ]:
+            self.addStringAsFile(pprint.pformat(self.query_api(url)), filename=outfile)
 
 
     def __getFiles(self, configDirAry):

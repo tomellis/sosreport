@@ -194,9 +194,14 @@ class Plugin(object):
     def doCopyFileOrDir(self, srcpath, dest=None, sub=None):
         # pylint: disable-msg = R0912
         # pylint: disable-msg = R0915
-        ''' Copy file or directory to the destination tree. If a directory, then everything
-        below it is recursively copied. A list of copied files are saved for use later
-        in preparing a report
+        '''
+        Copy file or directory to the destination tree. If a directory,
+        then everything below it is recursively copied. A list of copied files
+        are saved for use later in preparing a report.  sub can be used to
+        rename the destination of the file, sub should be a two-tuple of
+        (old,new). For example if you passed in ("etc","configurations") for
+        use against /etc/my_file.conf the file would end up at
+        /configurations/my_file.conf.
         '''
 
         if self.cInfo['cmdlineopts'].profiler:
@@ -226,12 +231,11 @@ class Plugin(object):
                     if afile == '.' or afile == '..':
                         pass
                     else:
-                        self.doCopyFileOrDir(os.path.join(srcpath, afile), dest=dest, sub=sub)
+                        self.doCopyFileOrDir(os.path.join(srcpath, afile), dest=None, sub=sub)
                 return
 
         # if we get here, it's definitely a regular file (not a symlink or dir)
-
-        self.soslog.debug("copying file %s" % srcpath)
+        self.soslog.debug("copying file %s to %s" % (srcpath,dest))
 
         self.archive.add_file(srcpath, dest)
 
