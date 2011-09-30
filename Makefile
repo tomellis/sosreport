@@ -63,5 +63,5 @@ rpm: clean $(NAME)-$(VERSION).tar.gz
 
 gpgkey:
 	@echo "Building gpg key"
-#     @test -f gpgkeys/rhsupport.pub && echo "GPG key already exists." || \
-#     gpg --batch --gen-key gpgkeys/gpg.template
+	@test -f gpgkeys/rhsupport.pub && echo "GPG key already exists." || \
+	gpg --batch --gen-key gpgkeys/gpg.template
