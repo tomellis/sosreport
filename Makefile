@@ -84,3 +84,9 @@ zip: clean
 	zip -r $(ZIP_DEST) __run__.py
 	@cd $(ZIP_BUILD) && zip -r $(ARCHIVE_NAME) sos
 	@cd $(ZIP_BUILD) && rm -rf sos
+
+test:
+	@for test in `ls tests/*test*.py`; do \
+		echo $$test; \
+		PYTHONPATH=`pwd` python $$test; \
+	done; \
