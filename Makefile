@@ -37,12 +37,12 @@ install:
 	install -m644 LICENSE README TODO $(DESTDIR)/usr/share/$(NAME)/.
 	install -m644 $(NAME).conf $(DESTDIR)/etc/$(NAME).conf
 	install -m644 gpgkeys/rhsupport.pub $(DESTDIR)/usr/share/$(NAME)/.
-	sed 's/@SOSVERSION@/$(VERSION)/g'<sos/__init__.py.in >sos/__init__.py
+	sed 's/@SOSVERSION@/$(VERSION)/g' < sos/__init__.py > sos/__init__.py
 	for d in $(SUBDIRS); do make DESTDIR=`cd $(DESTDIR); pwd` -C $$d install; [ $$? = 0 ] || exit 1; done
 
 $(NAME)-$(VERSION).tar.gz: clean gpgkey
-	@mkdir -p $(RPM_BUILD_DIR)
-	@svn export --force $(PWD) $(RPM_BUILD_DIR)/$(NAME)-$(VERSION)
+	@mkdir -p $(RPM_BUILD_DIR)/$(NAME)-$(VERSION)
+	@git archive `git branch --no-color 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/'` | tar -x -C $(RPM_BUILD_DIR)/$(NAME)-$(VERSION)
 	@mkdir -p $(RPM_BUILD_DIR)/$(NAME)-$(VERSION)/gpgkeys
 	@cp gpgkeys/rhsupport.pub $(RPM_BUILD_DIR)/$(NAME)-$(VERSION)/gpgkeys/.
 	@tar Ccvzf $(RPM_BUILD_DIR) $(RPM_BUILD_DIR)/$(NAME)-$(VERSION).tar.gz $(NAME)-$(VERSION)
@@ -63,5 +63,5 @@ rpm: clean $(NAME)-$(VERSION).tar.gz
 
 gpgkey:
 	@echo "Building gpg key"
-	@test -f gpgkeys/rhsupport.pub && echo "GPG key already exists." || \
-	gpg --batch --gen-key gpgkeys/gpg.template
+#     @test -f gpgkeys/rhsupport.pub && echo "GPG key already exists." || \
+#     gpg --batch --gen-key gpgkeys/gpg.template
