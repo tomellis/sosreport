@@ -12,5 +12,4 @@ To access to the public source code repository for this project run:
 
 to install locally (as root) ==> make install
 to build an rpm ==> make rpm
-
-See the Makefile.
+to build a zipfile for use with jython ==> make zip
