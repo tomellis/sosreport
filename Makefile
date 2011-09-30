@@ -10,6 +10,7 @@ REPO = http://svn.fedorahosted.org/svn/sos
 SUBDIRS = po sos sos/plugins
 PYFILES = $(wildcard *.py)
 
+
 RPM_BUILD_DIR = rpm-build
 RPM_DEFINES = --define "_topdir %(pwd)/$(RPM_BUILD_DIR)" \
 	--define "_builddir %{_topdir}" \
@@ -19,6 +20,11 @@ RPM_DEFINES = --define "_topdir %(pwd)/$(RPM_BUILD_DIR)" \
 	--define "_sourcedir %{_topdir}"
 RPM = rpmbuild
 RPM_WITH_DIRS = $(RPM) $(RPM_DEFINES)
+
+ARCHIVE_NAME = sosreport.zip
+ZIP_BUILD = $(RPM_BUILD_DIR)/buildjar
+PO_DIR = $(ZIP_BUILD)/sos/po
+ZIP_DEST = $(ZIP_BUILD)/$(ARCHIVE_NAME)
 
 build:
 	for d in $(SUBDIRS); do make -C $$d; [ $$? = 0 ] || exit 1 ; done
@@ -65,3 +71,16 @@ gpgkey:
 	@echo "Building gpg key"
 	@test -f gpgkeys/rhsupport.pub && echo "GPG key already exists." || \
 	gpg --batch --gen-key gpgkeys/gpg.template
+
+zip: clean
+	mkdir -p $(PO_DIR)
+	@for po in `ls po/*.po`; do \
+		msgcat -p -o $(PO_DIR)/$$(basename $$po | awk -F. '{print $$1}').properties $$po; \
+	done; \
+
+	cp $(PO_DIR)/en.properties $(PO_DIR)/en_US.properties
+
+	zip -r $(ZIP_DEST) sos
+	zip -r $(ZIP_DEST) __run__.py
+	@cd $(ZIP_BUILD) && zip -r $(ARCHIVE_NAME) sos
+	@cd $(ZIP_BUILD) && rm -rf sos
