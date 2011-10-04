@@ -20,6 +20,7 @@ RPM_DEFINES = --define "_topdir %(pwd)/$(RPM_BUILD_DIR)" \
 	--define "_sourcedir %{_topdir}"
 RPM = rpmbuild
 RPM_WITH_DIRS = $(RPM) $(RPM_DEFINES)
+ARCHIVE_DIR = $(RPM_BUILD_DIR)/$(NAME)-$(VERSION)
 
 ARCHIVE_NAME = sosreport.zip
 ZIP_BUILD = $(RPM_BUILD_DIR)/buildjar
@@ -47,10 +48,10 @@ install:
 	for d in $(SUBDIRS); do make DESTDIR=`cd $(DESTDIR); pwd` -C $$d install; [ $$? = 0 ] || exit 1; done
 
 $(NAME)-$(VERSION).tar.gz: clean gpgkey
-	@mkdir -p $(RPM_BUILD_DIR)/$(NAME)-$(VERSION)
-	@git archive `git branch --no-color 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/'` | tar -x -C $(RPM_BUILD_DIR)/$(NAME)-$(VERSION)
-	@mkdir -p $(RPM_BUILD_DIR)/$(NAME)-$(VERSION)/gpgkeys
-	@cp gpgkeys/rhsupport.pub $(RPM_BUILD_DIR)/$(NAME)-$(VERSION)/gpgkeys/.
+	@mkdir -p $(ARCHIVE_DIR)
+	@tar -cv sosreport sos doc man po sos.conf TODO LICENSE README sos.spec Makefile | tar -x -C $(ARCHIVE_DIR)
+	@mkdir -p $(ARCHIVE_DIR)/gpgkeys
+	@cp gpgkeys/rhsupport.pub $(ARCHIVE_DIR)/gpgkeys/.
 	@tar Ccvzf $(RPM_BUILD_DIR) $(RPM_BUILD_DIR)/$(NAME)-$(VERSION).tar.gz $(NAME)-$(VERSION)
 
 clean:
