@@ -1,80 +1,106 @@
-from xml.etree import ElementTree
+"""This provides a restricted tag language to define the sosreport index/report"""
 
-class Error(Exception):
-    """Exception throw when any error occurs in the reporting framework"""
-    pass
+try:
+    import json
+except ImportError:
+    import simplejson as json
 
-class ReportNode(object):
 
-    ELEMENT_NAME = "node"
-
-    def __init__(self, name=None, content=None):
-        self.element = ElementTree.Element(self.ELEMENT_NAME)
-
-        if name:
-            self.element.attrib['name'] = name
-
-        if content:
-            self.add_content(content)
+class Node(object):
 
     def __str__(self):
-        return ElementTree.tostring(self.element)
-
-    def add(self, node):
-        if self.can_add(node):
-            self.element.append(node.element)
-        else:
-            raise Error("Adding this %s to %s is not allowed." % (
-                node.element.attrib['name'],
-                self.element.attrib['name'],))
-
-    def add_content(self, content):
-        for item in content:
-            self.add(item)
+        return json.dumps(self.data)
 
     def can_add(self, node):
         return False
 
 
-class Report(ReportNode):
+class Report(Node):
     """The root element of a report. This is a container for sections."""
 
-    ELEMENT_NAME = "report"
+    def __init__(self):
+        self.data = {}
 
     def can_add(self, node):
-        return not issubclass(node.__class__, self.__class__)
+        return isinstance(node, Section)
+
+    def add(self, *nodes):
+        for node in nodes:
+            if self.can_add(node):
+                self.data[node.name] = node.data
 
 
-class Section(ReportNode):
+class Section(Node):
     """A section is a container for leaf elements. Sections may be nested
     inside of Report objects only."""
 
-    ELEMENT_NAME = "section"
+    def __init__(self, name):
+        self.name = name
+        self.data = {}
 
     def can_add(self, node):
-        return not issubclass(node.__class__, (Report, self.__class__))
+        return isinstance(node, (Command, CopiedFile, CreatedFile))
+
+    def add(self, *nodes):
+        for node in nodes:
+            if self.can_add(node):
+                self.data.setdefault(node.ADDS_TO, []).append(node.data)
 
 
-class Block(ReportNode):
+class Command(Node):
 
-    ELEMENT_NAME = "block"
+    ADDS_TO = "commands"
 
-
-class List(ReportNode):
-
-    ELEMENT_NAME = "list"
-
-    def add_item(self, item, href=None):
-        item_element = ElementTree.SubElement(self.element, 'item')
-        item_element.text = item
-        if href:
-            item_element.attrib['href'] = href
-
-    def add_content(self, content):
-        for item in content:
-            self.add_item(item)
+    def __init__(self, name, return_code, href):
+        self.data = {"name": name,
+                     "return_code": return_code,
+                     "href": href}
 
 
-class Pre(ReportNode):
+class CopiedFile(Node):
 
-    ELEMENT_NAME = "pre"
+    ADDS_TO = "copied_files"
+
+    def __init__(self, name, href):
+        self.data = {"name": name,
+                     "href": href}
+
+
+class CreatedFile(Node):
+
+    ADDS_TO = "created_files"
+
+    def __init__(self, name):
+        self.data = {"name": name}
+
+
+class PlainTextReport(object):
+    """Will generate a plain text report from a top_level Report object"""
+
+    LEAF = "  * %(name)s"
+
+    subsections = (
+        (Command.ADDS_TO, "  commands executed:"),
+        (CopiedFile.ADDS_TO, "  files copied:"),
+        (CreatedFile.ADDS_TO, "  files created:"),
+    )
+
+    buf = []
+
+    def __init__(self, report_node):
+        self.report_node = report_node
+
+    def __str__(self):
+        self.buf = buf = []
+        for section_name, section_contents in iter(sorted(self.report_node.data.iteritems())):
+            buf.append(section_name + "\n")
+            for key, header in self.subsections:
+                self.process_subsection(section_contents, key, header)
+
+        return "\n".join(buf)
+
+    def process_subsection(self, section, key, header):
+        if key in section:
+            self.buf.append(header)
+            for item in section.get(key):
+                self.buf.append(self.LEAF % item)

@@ -4,3 +4,5 @@
 *.sw*
 tags
 buildjar/
+gpgkeys/rhsupport.*
+rpm-build/*

@@ -3,93 +3,107 @@
 import unittest
 import os
 
-from sos.reporting import Report, Section, Block, List, Error
+try:
+    import json
+except ImportError:
+    import simplejson as json
+
+from sos.reporting import Report, Section, Command, CopiedFile, CreatedFile
+from sos.reporting import PlainTextReport
 
 class ReportTest(unittest.TestCase):
 
     def test_empty(self):
         report = Report()
 
-        self.assertEquals("<report />", str(report))
+        expected = json.dumps({})
 
-    def test_named(self):
-        report = Report(name="sosreport")
-
-        self.assertEquals('<report name="sosreport" />', str(report))
+        self.assertEquals(expected, str(report))
 
     def test_nested_section(self):
-        report = Report(name="parent")
+        report = Report()
         section = Section(name="section")
         report.add(section)
 
-        self.assertEquals('<report name="parent"><section name="section" /></report>',
-                str(report))
+        expected = json.dumps({"section": {}})
 
-    def test_cannot_nest_reports(self):
-        report1 = Report(name="first")
-        report2 = Report(name="second")
+        self.assertEquals(expected, str(report))
 
-        try:
-            report1.add(report2)
-            self.fail("Was allowed to nest two report objects.")
-        except Error:
-            pass
+    def test_multiple_sections(self):
+        report = Report()
+        section = Section(name="section")
+        report.add(section)
+
+        section2 = Section(name="section2")
+        report.add(section2)
+
+        expected = json.dumps({"section": {},
+                               "section2": {},})
+
+        self.assertEquals(expected, str(report))
+
 
     def test_deeply_nested(self):
         report = Report()
-        section = Section()
-        block = Block()
+        section = Section(name="section")
+        command = Command(name="a command", return_code=0, href="does/not/matter")
 
-        section.add(block)
+        section.add(command)
         report.add(section)
 
-        self.assertEquals('<report><section><block /></section></report>', str(report))
+        expected = json.dumps({"section": {"commands": [{"name": "a command",
+                                                         "return_code": 0,
+                                                         "href": "does/not/matter"}]}})
 
-class SectionTest(unittest.TestCase):
+        self.assertEquals(expected, str(report))
 
-    def test_empty(self):
-        section = Section()
 
-        self.assertEquals("<section />", str(section))
+class TestPlainReport(unittest.TestCase):
 
-    def test_named(self):
-        section = Section(name="test")
+    def setUp(self):
+        self.report = Report()
+        self.section = Section(name="plugin")
 
-        self.assertEquals('<section name="test" />', str(section))
+    def test_basic(self):
+        self.assertEquals("", str(PlainTextReport(self.report)))
 
-    def test_cannot_add_a_report(self):
-        section = Section(name="test")
-        report = Report(name="test")
+    def test_one_section(self):
+        self.report.add(self.section)
 
-        try:
-            section.add(report)
-            self.fail("Was allowed to nest a report in a section.")
-        except Error:
-            pass
+        self.assertEquals("plugin\n", str(PlainTextReport(self.report)))
 
-class ListTest(unittest.TestCase):
+    def test_two_sections(self):
+        section1 = Section(name="first")
+        section2 = Section(name="second")
+        self.report.add(section1, section2)
 
-    def test_add_item(self):
-        list_ = List(name="test")
-        list_.add_item("an item")
+        self.assertEquals("first\n\nsecond\n", str(PlainTextReport(self.report)))
 
-        self.assertEquals('<list name="test"><item>an item</item></list>', str(list_))
+    def test_command(self):
+        cmd = Command(name="ls -al /foo/bar/baz",
+                      return_code=0,
+                      href="sos_commands/plugin/ls_-al_foo.bar.baz")
+        self.section.add(cmd)
+        self.report.add(self.section)
 
-    def test_add_item_with_href(self):
-        list_ = List(name="test")
-        list_.add_item("an item", href="path/to/an/item")
+        self.assertEquals("plugin\n\n  commands executed:\n  * ls -al /foo/bar/baz",
+                str(PlainTextReport(self.report)))
 
-        self.assertEquals(
-                '<list name="test"><item href="path/to/an/item">an item</item></list>',
-                str(list_))
+    def test_copied_file(self):
+        cf = CopiedFile(name="/etc/hosts", href="etc/hosts")
+        self.section.add(cf)
+        self.report.add(self.section)
 
-    def test_add_real_list(self):
-        list_ = List(name="test", content=['an item', 'another item'])
+        self.assertEquals("plugin\n\n  files copied:\n  * /etc/hosts",
+                str(PlainTextReport(self.report)))
 
-        self.assertEquals(
-                '<list name="test"><item>an item</item><item>another item</item></list>',
-                str(list_))
+    def test_created_file(self):
+        crf = CreatedFile(name="sample.txt")
+        self.section.add(crf)
+        self.report.add(self.section)
 
+        self.assertEquals("plugin\n\n  files created:\n  * sample.txt",
+                str(PlainTextReport(self.report)))
 
 if __name__ == "__main__":
     unittest.main()
