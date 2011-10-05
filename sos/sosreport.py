@@ -53,7 +53,7 @@ import tempfile
 from sos import _sos as _
 from sos import __version__
 from sos.utilities import TarFileArchive, ZipFileArchive
-from sos.reporting import Report, Section, Command, CopiedFile, CreatedFile, Alert, PlainTextReport
+from sos.reporting import Report, Section, Command, CopiedFile, CreatedFile, Alert, Note, PlainTextReport
 
 if os.path.isfile('/etc/fedora-release'):
     __distro__ = 'Fedora'
@@ -716,6 +716,7 @@ No changes will be made to your system.
         self.xml_report.serialize_to_file(
             os.path.join(self.rptdir, "sosreport.xml"))
 
+
     def plain_report(self):
         report = Report()
 
@@ -724,6 +725,9 @@ No changes will be made to your system.
 
             for alert in plug.alerts:
                 section.add(Alert(alert))
+
+            if plug.customText:
+                section.add(Note(plug.customText))
 
             for f in plug.copiedFiles:
                 section.add(CopiedFile(name=f["srcpath"], href=f["dstpath"]))

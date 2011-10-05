@@ -14,6 +14,10 @@ class Node(object):
     def can_add(self, node):
         return False
 
+class Leaf(Node):
+    """Marker class that can be added to a Section node"""
+    pass
+
 
 class Report(Node):
     """The root element of a report. This is a container for sections."""
@@ -39,8 +43,7 @@ class Section(Node):
         self.data = {}
 
     def can_add(self, node):
-        return isinstance(node,
-                (Command, CopiedFile, CreatedFile, Alert))
+        return isinstance(node, Leaf)
 
     def add(self, *nodes):
         for node in nodes:
@@ -48,7 +51,7 @@ class Section(Node):
                 self.data.setdefault(node.ADDS_TO, []).append(node.data)
 
 
-class Command(Node):
+class Command(Leaf):
 
     ADDS_TO = "commands"
 
@@ -58,7 +61,7 @@ class Command(Node):
                      "href": href}
 
 
-class CopiedFile(Node):
+class CopiedFile(Leaf):
 
     ADDS_TO = "copied_files"
 
@@ -67,7 +70,7 @@ class CopiedFile(Node):
                      "href": href}
 
 
-class CreatedFile(Node):
+class CreatedFile(Leaf):
 
     ADDS_TO = "created_files"
 
@@ -75,9 +78,16 @@ class CreatedFile(Node):
         self.data = {"name": name}
 
 
-class Alert(Node):
+class Alert(Leaf):
 
     ADDS_TO = "alerts"
+
+    def __init__(self, content):
+        self.data = content
+
+class Note(Leaf):
+
+    ADDS_TO = "notes"
 
     def __init__(self, content):
         self.data = content
@@ -88,6 +98,7 @@ class PlainTextReport(object):
 
     LEAF  = "  * %(name)s"
     ALERT = "  ! %s"
+    NOTE  = "  * %s"
     DIVIDER = "=" * 72
 
     subsections = (
@@ -95,6 +106,7 @@ class PlainTextReport(object):
         (CopiedFile, LEAF,   "-  files copied:"),
         (CreatedFile, LEAF,  "-  files created:"),
         (Alert, ALERT,       "-  alerts:"),
+        (Note, NOTE,         "-  notes:"),
     )
 
     buf = []
