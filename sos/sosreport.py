@@ -738,6 +738,7 @@ No changes will be made to your system.
 
         fd = tempfile.NamedTemporaryFile()
         fd.write(str(PlainTextReport(report)))
+        fd.flush()
         self.archive.add_file(fd.name, dest=os.path.join('sos_reports', 'sos.txt'))
 
 
