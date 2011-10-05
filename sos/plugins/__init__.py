@@ -88,7 +88,6 @@ class Plugin(object):
             self.optionList = deque()
 
         self.copiedFiles = deque()
-        self.copiedDirs = deque()
         self.executedCommands = deque()
         self.diagnose_msgs = deque()
         self.alerts = deque()
@@ -168,21 +167,29 @@ class Plugin(object):
         return False
 
     def copy_symlink(self, srcpath):
-            link = os.readlink(srcpath)
-            if not os.path.isabs(link):
-                link = os.path.normpath(
-                        os.path.join(
-                            os.path.dirname(srcpath),
-                            link)
-                        )
+        link = os.readlink(srcpath)
+        if not os.path.isabs(link):
+            link = os.path.normpath(
+                    os.path.join(
+                        os.path.dirname(srcpath),
+                        link)
+                    )
 
-            self.archive.add_file(link, dest=srcpath)
+        if os.path.isdir(link):
+            self.soslog.debug("link %s is a directory, skipping..." % link)
+            return
 
-            self.copiedFiles.append({
-                'srcpath':srcpath,
-                'dstpath':srcpath,
-                'symlink':"yes",
-                'pointsto':link})
+        self.archive.add_file(link, dest=srcpath)
+
+        self.copiedFiles.append({
+            'srcpath':srcpath,
+            'dstpath':srcpath,
+            'symlink':"yes",
+            'pointsto':link})
+
+    def copy_dir(self, srcpath):
+        for afile in os.listdir(srcpath):
+            self.doCopyFileOrDir(os.path.join(srcpath, afile), dest=None, sub=None)
 
     def _get_dest_for_srcpath(self, srcpath):
         for copied in self.copiedFiles:
@@ -227,26 +234,25 @@ class Plugin(object):
             return
         else:
             if os.path.isdir(srcpath):
-                for afile in os.listdir(srcpath):
-                    if afile == '.' or afile == '..':
-                        pass
-                    else:
-                        self.doCopyFileOrDir(os.path.join(srcpath, afile), dest=None, sub=sub)
+                self.copy_dir(srcpath)
                 return
 
         # if we get here, it's definitely a regular file (not a symlink or dir)
         self.soslog.debug("copying file %s to %s" % (srcpath,dest))
 
-        self.archive.add_file(srcpath, dest)
+        try:
+            self.archive.add_file(srcpath, dest)
 
-        self.copiedFiles.append({
-            'srcpath':srcpath,
-            'dstpath':dest,
-            'symlink':"no"})
+            self.copiedFiles.append({
+                'srcpath':srcpath,
+                'dstpath':dest,
+                'symlink':"no"})
 
-        if self.cInfo['cmdlineopts'].profiler:
-            time_passed = time() - start_time
-            self.proflog.debug("copied: %-75s time: %f" % (srcpath, time_passed))
+            if self.cInfo['cmdlineopts'].profiler:
+                time_passed = time() - start_time
+                self.proflog.debug("copied: %-75s time: %f" % (srcpath, time_passed))
+        except Exception, e:
+            self.soslog.debug(traceback.format_exc())
 
 
     def addForbiddenPath(self, forbiddenPath):
@@ -536,16 +542,6 @@ class Plugin(object):
                 html = html + '<li><a href="%s">%s</a>' % (afile['dstpath'], afile['srcpath'])
                 if (afile['symlink'] == "yes"):
                     html = html + " (symlink to %s)" % afile['pointsto']
-                html = html + '</li>\n'
-            html = html + "</ul></p>\n"
-
-        # Dirs
-        if len(self.copiedDirs):
-            html = html + "<p>Directories Copied:<br><ul>\n"
-            for adir in self.copiedDirs:
-                html = html + '<li><a href="%s">%s</a>\n' % (adir['dstpath'], adir['srcpath'])
-                if (adir['symlink'] == "yes"):
-                    html = html + " (symlink to %s)" % adir['pointsto']
                 html = html + '</li>\n'
             html = html + "</ul></p>\n"
 

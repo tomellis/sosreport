@@ -46,6 +46,7 @@ class EAP6(Plugin, IndependentPlugin):
         Returns:
             True JBOSS_HOME is set and the path exists.  False otherwise.
         """
+
         if self.getOption("home"):
             ## Prefer this value first over the ENV
             self.__jbossHome=self.getOption("home")

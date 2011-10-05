@@ -112,6 +112,9 @@ class RHELPolicy(Policy):
         from sos.utilities import TarFileArchive
         return TarFileArchive
 
+    def pkgByName(self, name):
+        return self.package_manager.pkgByName(name)
+
     def _parse_uname(self):
         (system, node, release,
          version, machine, processor) = platform.uname()

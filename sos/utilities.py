@@ -32,7 +32,10 @@ from subprocess import Popen, PIPE
 import logging
 import zipfile
 import tarfile
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 import time
 import pwd
 import grp
@@ -224,23 +227,20 @@ def find(file_pattern, top_dir, max_depth=None, path_pattern=None):
 
 
 def sosGetCommandOutput(command, timeout=300):
-    """ Execute a command and gather stdin, stdout, and return status.
-    """
-    # soslog = logging.getLogger('sos')
-    # Log if binary is not runnable or does not exist
-    for path in os.environ["PATH"].split(":"):
-        cmdfile = command.strip("(").split()[0]
-        # handle both absolute or relative paths
-        if ( ( not os.path.isabs(cmdfile) and os.access(os.path.join(path,cmdfile), os.X_OK) ) or \
-           ( os.path.isabs(cmdfile) and os.access(cmdfile, os.X_OK) ) ):
-            break
+    """Execute a command through the system shell. First checks to see if the
+    requested command is executable. Returns (returncode, stdout, 0)"""
+    # XXX: what is this doing this for?
+    cmdfile = command.strip("(").split()[0]
+
+    possibles = [cmdfile] + [os.path.join(path, cmdfile) for path in os.environ.get("PATH", "").split(":")]
+
+    if any(os.access(path, os.X_OK) for path in possibles):
+        p = Popen(command, shell=True, stdout=PIPE, stderr=PIPE, bufsize=-1)
+        stdout, stderr = p.communicate()
+        return (p.returncode, stdout.strip(), 0)
     else:
-        # soslog.log(logging.VERBOSE, "binary '%s' does not exist or is not runnable" % cmdfile)
         return (127, "", 0)
 
-    p = Popen(command, shell=True, stdout=PIPE, stderr=PIPE, bufsize=-1)
-    stdout, stderr = p.communicate()
-    return (p.returncode, stdout.strip(), 0)
 
 def import_module(module_fqname, superclass=None):
     module_name = module_fqname.rpartition(".")[-1]
@@ -278,7 +278,15 @@ class TarFileArchive(Archive):
         else:
             dest = self.prepend(src)
 
-        self.tarfile.add(src, arcname=dest)
+        fp = open(src, 'rb')
+        content = fp.read()
+        fp.close()
+
+        tar_info = tarfile.TarInfo(name=dest)
+        tar_info.size = len(content)
+        tar_info.mtime = os.stat(src).st_mtime
+
+        self.tarfile.addfile(tar_info, StringIO(content))
 
     def add_string(self, content, dest):
         dest = self.prepend(dest)

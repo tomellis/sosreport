@@ -8,7 +8,7 @@ try:
 except ImportError:
     import simplejson as json
 
-from sos.reporting import Report, Section, Command, CopiedFile, CreatedFile
+from sos.reporting import Report, Section, Command, CopiedFile, CreatedFile, Alert
 from sos.reporting import PlainTextReport
 
 class ReportTest(unittest.TestCase):
@@ -63,6 +63,7 @@ class TestPlainReport(unittest.TestCase):
     def setUp(self):
         self.report = Report()
         self.section = Section(name="plugin")
+        self.div = PlainTextReport.DIVIDER
 
     def test_basic(self):
         self.assertEquals("", str(PlainTextReport(self.report)))
@@ -70,14 +71,14 @@ class TestPlainReport(unittest.TestCase):
     def test_one_section(self):
         self.report.add(self.section)
 
-        self.assertEquals("plugin\n", str(PlainTextReport(self.report)))
+        self.assertEquals("plugin\n" + self.div, str(PlainTextReport(self.report)))
 
     def test_two_sections(self):
         section1 = Section(name="first")
         section2 = Section(name="second")
         self.report.add(section1, section2)
 
-        self.assertEquals("first\n\nsecond\n", str(PlainTextReport(self.report)))
+        self.assertEquals("first\n" + self.div + "\nsecond\n" + self.div, str(PlainTextReport(self.report)))
 
     def test_command(self):
         cmd = Command(name="ls -al /foo/bar/baz",
@@ -86,7 +87,7 @@ class TestPlainReport(unittest.TestCase):
         self.section.add(cmd)
         self.report.add(self.section)
 
-        self.assertEquals("plugin\n\n  commands executed:\n  * ls -al /foo/bar/baz",
+        self.assertEquals("plugin\n" + self.div + "\n-  commands executed:\n  * ls -al /foo/bar/baz",
                 str(PlainTextReport(self.report)))
 
     def test_copied_file(self):
@@ -94,7 +95,7 @@ class TestPlainReport(unittest.TestCase):
         self.section.add(cf)
         self.report.add(self.section)
 
-        self.assertEquals("plugin\n\n  files copied:\n  * /etc/hosts",
+        self.assertEquals("plugin\n" + self.div + "\n-  files copied:\n  * /etc/hosts",
                 str(PlainTextReport(self.report)))
 
     def test_created_file(self):
@@ -102,7 +103,15 @@ class TestPlainReport(unittest.TestCase):
         self.section.add(crf)
         self.report.add(self.section)
 
-        self.assertEquals("plugin\n\n  files created:\n  * sample.txt",
+        self.assertEquals("plugin\n" + self.div + "\n-  files created:\n  * sample.txt",
+                str(PlainTextReport(self.report)))
+
+    def test_alert(self):
+        alrt = Alert("this is an alert")
+        self.section.add(alrt)
+        self.report.add(self.section)
+
+        self.assertEquals("plugin\n" + self.div + "\n-  alerts:\n  ! this is an alert",
                 str(PlainTextReport(self.report)))
 
 if __name__ == "__main__":

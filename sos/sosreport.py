@@ -53,6 +53,7 @@ import tempfile
 from sos import _sos as _
 from sos import __version__
 from sos.utilities import TarFileArchive, ZipFileArchive
+from sos.reporting import Report, Section, Command, CopiedFile, CreatedFile, Alert, PlainTextReport
 
 if os.path.isfile('/etc/fedora-release'):
     __distro__ = 'Fedora'
@@ -382,7 +383,7 @@ No changes will be made to your system.
         self.sos_log_file = tempfile.NamedTemporaryFile()
         flog = logging.FileHandler(self.sos_log_file.name)
         flog.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
-        flog.setLevel(logging.VERBOSE3)
+        flog.setLevel(logging.INFO)
         self.soslog.addHandler(flog)
 
         if self.opts.profiler:
@@ -395,10 +396,12 @@ No changes will be made to your system.
 
         # define a Handler which writes INFO messages or higher to the sys.stderr
         console = logging.StreamHandler(sys.stderr)
-        if self.opts.verbosity > 0:
+        if self.opts.verbosity > 1:
             console.setLevel(logging.DEBUG)
-        else:
+        elif self.opts.verbosity > 0:
             console.setLevel(logging.INFO)
+        else:
+            console.setLevel(logging.FATAL)
         console.setFormatter(logging.Formatter('%(message)s'))
         self.soslog.addHandler(console)
 
@@ -620,8 +623,8 @@ No changes will be made to your system.
                 print
                 self._exit()
 
-    def _log_plugin_exception(self):
-        self.soslog.error(traceback.format_exc())
+    def _log_plugin_exception(self, plugin_name):
+        self.soslog.error("%s\n%s" % (plugin_name, traceback.format_exc()))
 
     def diagnose(self):
         tmpcount = 0
@@ -632,7 +635,7 @@ No changes will be made to your system.
                 if self.raise_plugins:
                     raise
                 else:
-                    self._log_plugin_exception()
+                    self._log_plugin_exception(plugname)
 
             tmpcount += len(plug.diagnose_msgs)
         if tmpcount > 0:
@@ -681,7 +684,7 @@ No changes will be made to your system.
                 if self.raise_plugins:
                     raise
                 else:
-                    self._log_plugin_exception()
+                    self._log_plugin_exception(plugname)
 
     def copy_stuff(self):
         plugruncount = 0
@@ -700,7 +703,7 @@ No changes will be made to your system.
                 if self.raise_plugins:
                     raise
                 else:
-                    self._log_plugin_exception()
+                    self._log_plugin_exception(plugname)
 
     def report(self):
         for plugname, plug in self.loaded_plugins:
@@ -712,6 +715,31 @@ No changes will be made to your system.
 
         self.xml_report.serialize_to_file(
             os.path.join(self.rptdir, "sosreport.xml"))
+
+    def plain_report(self):
+        report = Report()
+
+        for plugname, plug in self.loaded_plugins:
+            section = Section(name=plugname)
+
+            for alert in plug.alerts:
+                section.add(Alert(alert))
+
+            for f in plug.copiedFiles:
+                section.add(CopiedFile(name=f["srcpath"], href=f["dstpath"]))
+
+            for cmd in plug.executedCommands:
+                section.add(Command(name=cmd['exe'], return_code=0, href=cmd['file']))
+
+            for content, f in plug.copyStrings:
+                section.add(CreatedFile(name=f))
+
+            report.add(section)
+
+        fd = tempfile.NamedTemporaryFile()
+        fd.write(str(PlainTextReport(report)))
+        self.archive.add_file(fd.name, dest=os.path.join('sos_reports', 'sos.txt'))
+
 
     def html_report(self):
         # Generate the header for the html output file
@@ -831,6 +859,7 @@ def main(args):
     if sos.opts.report:
         sos.report()
         sos.html_report()
+        sos.plain_report()
 
     sos.postproc()
 

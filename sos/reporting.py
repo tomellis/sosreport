@@ -39,7 +39,8 @@ class Section(Node):
         self.data = {}
 
     def can_add(self, node):
-        return isinstance(node, (Command, CopiedFile, CreatedFile))
+        return isinstance(node,
+                (Command, CopiedFile, CreatedFile, Alert))
 
     def add(self, *nodes):
         for node in nodes:
@@ -74,15 +75,26 @@ class CreatedFile(Node):
         self.data = {"name": name}
 
 
+class Alert(Node):
+
+    ADDS_TO = "alerts"
+
+    def __init__(self, content):
+        self.data = content
+
+
 class PlainTextReport(object):
     """Will generate a plain text report from a top_level Report object"""
 
-    LEAF = "  * %(name)s"
+    LEAF  = "  * %(name)s"
+    ALERT = "  ! %s"
+    DIVIDER = "=" * 72
 
     subsections = (
-        (Command.ADDS_TO, "  commands executed:"),
-        (CopiedFile.ADDS_TO, "  files copied:"),
-        (CreatedFile.ADDS_TO, "  files created:"),
+        (Command, LEAF,      "-  commands executed:"),
+        (CopiedFile, LEAF,   "-  files copied:"),
+        (CreatedFile, LEAF,  "-  files created:"),
+        (Alert, ALERT,       "-  alerts:"),
     )
 
     buf = []
@@ -92,15 +104,15 @@ class PlainTextReport(object):
 
     def __str__(self):
         self.buf = buf = []
-        for section_name, section_contents in iter(sorted(self.report_node.data.iteritems())):
-            buf.append(section_name + "\n")
-            for key, header in self.subsections:
-                self.process_subsection(section_contents, key, header)
+        for section_name, section_contents in sorted(self.report_node.data.iteritems()):
+            buf.append(section_name + "\n" + self.DIVIDER)
+            for type_, format_, header in self.subsections:
+                self.process_subsection(section_contents, type_.ADDS_TO, header, format_)
 
         return "\n".join(buf)
 
-    def process_subsection(self, section, key, header):
+    def process_subsection(self, section, key, header, format_):
         if key in section:
             self.buf.append(header)
             for item in section.get(key):
-                self.buf.append(self.LEAF % item)
+                self.buf.append(format_ % item)
