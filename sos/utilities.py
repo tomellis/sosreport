@@ -29,6 +29,7 @@ import inspect
 from stat import *
 from itertools import *
 from subprocess import Popen, PIPE
+import shlex
 import logging
 import zipfile
 import tarfile
@@ -321,7 +322,7 @@ class ZipFileArchive(Archive):
         except:
             compression = zipfile.ZIP_STORED
 
-        self.zipfile = zipfile.ZipFile(self.name(), mode="w")
+        self.zipfile = zipfile.ZipFile(self.name(), mode="w", compression=compression)
 
     def name(self):
         return "%s.zip" % self._name
@@ -361,5 +362,38 @@ class ZipFileArchive(Archive):
 
     def close(self):
         self.zipfile.close()
+
+
+def compress(archive, method):
+    """Compress an archive object via method. ZIP archives are ignored. If
+    method is automatic then the following technologies are tried in order: xz,
+    bz2 and gzip"""
+
+    if method == "zip":
+        return archive.name()
+
+    methods = ['xz', 'bzip2', 'gzip']
+
+    if method in ('xz', 'bzip2', 'gzip'):
+        methods = [method]
+
+    compressed = False
+    last_error = None
+    for cmd in ('xz', 'bzip2', 'gzip'):
+        if compressed:
+            break
+        try:
+            command = shlex.split("%s %s" % (cmd,archive.name()))
+            p = Popen(command, stdout=PIPE, stderr=PIPE, bufsize=-1)
+            stdout, stderr = p.communicate()
+            print stdout
+            print stderr
+            compressed = True
+            return archive.name() + "." + cmd
+        except Exception, e:
+            last_error = e
+
+    if not compressed:
+        raise last_error
 
 # vim:ts=4 sw=4 et

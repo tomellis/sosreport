@@ -52,7 +52,7 @@ import tempfile
 
 from sos import _sos as _
 from sos import __version__
-from sos.utilities import TarFileArchive, ZipFileArchive
+from sos.utilities import TarFileArchive, ZipFileArchive, compress
 from sos.reporting import Report, Section, Command, CopiedFile, CreatedFile, Alert, Note, PlainTextReport
 
 if os.path.isfile('/etc/fedora-release'):
@@ -155,7 +155,7 @@ def parse_options(opts):
                          dest="profiler",
                          help="turn on profiling", default=False)
     parser.add_option("-z", "--compression-type", dest="compression_type",
-                        help="compression technology to use [auto, zip, gz, bz2, xz] (default=auto)",
+                        help="compression technology to use [auto, zip, gzip, bzip2, xz] (default=auto)",
                         default="auto")
 
     return parser.parse_args(opts)
@@ -298,6 +298,8 @@ No changes will be made to your system.
                 }
 
     def _set_archive(self):
+        if self.opts.compression_type not in ('auto', 'zip', 'bzip2', 'gzip', 'xz'):
+            raise Exception("Invalid compression type specified. Options are: auto, zip, bzip2, gzip and xz")
         archive_name = os.path.join(self.opts.tmp_dir,self.policy.getArchiveName())
         if self.opts.compression_type == 'auto':
             auto_archive = self.policy.preferedArchive()
@@ -670,8 +672,12 @@ No changes will be made to your system.
                     self._exit(0)
 
     def prework(self):
-        self.policy.preWork()
-        self._set_archive()
+        try:
+            self.policy.preWork()
+            self._set_archive()
+        except Exception, e:
+            print e
+            self._exit(0)
 
     def setup(self):
         for plugname, plug in self.loaded_plugins:
@@ -822,16 +828,17 @@ No changes will be made to your system.
         # package up the results for the support organization
         self.policy.packageResults(self.archive.name())
 
-        # automated submission will go here
-        if not self.opts.upload:
-            self.policy.displayResults()
-        else:
-            self.policy.uploadResults()
-
-        # Close all log files and perform any cleanup
         self._finish_logging()
 
         self.archive.close()
+
+        final_filename = compress(self.archive, self.opts.compression_type)
+
+        # automated submission will go here
+        if not self.opts.upload:
+            self.policy.displayResults(final_filename)
+        else:
+            self.policy.uploadResults(final_filename)
 
     def ensure_plugins(self):
         if not self.loaded_plugins:

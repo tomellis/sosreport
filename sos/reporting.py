@@ -85,6 +85,7 @@ class Alert(Leaf):
     def __init__(self, content):
         self.data = content
 
+
 class Note(Leaf):
 
     ADDS_TO = "notes"

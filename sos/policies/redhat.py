@@ -265,7 +265,10 @@ class RHELPolicy(Policy):
            print _("There was a problem encrypting your report.")
            sys.exit(1)
 
-    def displayResults(self):
+    def displayResults(self, final_filename=None):
+
+        self.report_file = final_filename
+
         # make sure a report exists
         if not self.report_file:
            return False
@@ -290,6 +293,9 @@ class RHELPolicy(Policy):
         print
 
     def uploadResults(self):
+
+        self.report_file = final_filename
+
         # make sure a report exists
         if not self.report_file:
             return False
