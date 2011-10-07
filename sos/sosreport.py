@@ -41,7 +41,6 @@ import ConfigParser
 import sos.policies
 from sos.plugins import import_plugin
 from sos.utilities import ImporterHelper
-import signal
 from stat import ST_UID, ST_GID, ST_MODE, ST_CTIME, ST_ATIME, ST_MTIME, S_IMODE
 from time import strftime, localtime
 from collections import deque
@@ -263,7 +262,11 @@ No changes will be made to your system.
         self.all_options = deque()
         self.xml_report = XmlReport()
 
-        signal.signal(signal.SIGTERM, self.get_exit_handler())
+        try:
+            import signal
+            signal.signal(signal.SIGTERM, self.get_exit_handler())
+        except Exception:
+            pass # not available in java, but we don't care
 
         self._is_root = (os.getuid() == 0)
 
