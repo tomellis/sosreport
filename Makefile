@@ -83,6 +83,7 @@ po: clean
 
 eap6: po
 	cp -r sos/* $(SRC_BUILD)/sos/
+	find $(SRC_BUILD)/sos/plugins/ -not -name "*eap6.py" -type f -delete
 
 zip: po
 	zip -r $(ZIP_DEST) sos
