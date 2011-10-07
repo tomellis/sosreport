@@ -23,9 +23,9 @@ RPM_WITH_DIRS = $(RPM) $(RPM_DEFINES)
 ARCHIVE_DIR = $(RPM_BUILD_DIR)/$(NAME)-$(VERSION)
 
 ARCHIVE_NAME = sosreport.zip
-ZIP_BUILD = $(RPM_BUILD_DIR)/buildjar
-PO_DIR = $(ZIP_BUILD)/sos/po
-ZIP_DEST = $(ZIP_BUILD)/$(ARCHIVE_NAME)
+SRC_BUILD = $(RPM_BUILD_DIR)/sdist
+PO_DIR = $(SRC_BUILD)/sos/po
+ZIP_DEST = $(SRC_BUILD)/$(ARCHIVE_NAME)
 
 build:
 	for d in $(SUBDIRS); do make -C $$d; [ $$? = 0 ] || exit 1 ; done
@@ -73,18 +73,22 @@ gpgkey:
 	@test -f gpgkeys/rhsupport.pub && echo "GPG key already exists." || \
 	gpg --batch --gen-key gpgkeys/gpg.template
 
-zip: clean
+po: clean
 	mkdir -p $(PO_DIR)
-	@for po in `ls po/*.po`; do \
+	for po in `ls po/*.po`; do \
 		msgcat -p -o $(PO_DIR)/$$(basename $$po | awk -F. '{print $$1}').properties $$po; \
 	done; \
 
 	cp $(PO_DIR)/en.properties $(PO_DIR)/en_US.properties
 
+eap6: po
+	cp -r sos/* $(SRC_BUILD)/sos/
+
+zip: po
 	zip -r $(ZIP_DEST) sos
 	zip -r $(ZIP_DEST) __run__.py
-	@cd $(ZIP_BUILD) && zip -r $(ARCHIVE_NAME) sos
-	@cd $(ZIP_BUILD) && rm -rf sos
+	cd $(SRC_BUILD) && zip -r $(ARCHIVE_NAME) sos
+	cd $(SRC_BUILD) && rm -rf sos
 
 test:
 	@for test in `ls tests/*test*.py`; do \

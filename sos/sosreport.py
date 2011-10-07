@@ -59,6 +59,7 @@ if os.path.isfile('/etc/fedora-release'):
 else:
     __distro__ = 'Red Hat Enterprise Linux'
 
+
 class OptionParserExtended(OptionParser):
     """ Show examples """
     def print_help(self, out=sys.stdout):
@@ -340,7 +341,8 @@ No changes will be made to your system.
             pdb.pm()
 
     def _exit(self, error=0):
-        sys.exit(error)
+        raise SystemExit()
+#        sys.exit(error)
 
     def _exit_nice(self):
         for plugname, plugin in self.loaded_plugins:
@@ -850,32 +852,35 @@ No changes will be made to your system.
 
 def main(args):
     """The main entry point"""
-    sos = SoSReport(args)
+    try:
+        sos = SoSReport(args)
 
-    if sos.opts.listPlugins:
-        sos.list_plugins()
+        if sos.opts.listPlugins:
+            sos.list_plugins()
 
-    sos.ensure_plugins()
-    sos.batch()
+        sos.ensure_plugins()
+        sos.batch()
 
-    if sos.opts.diagnose:
-        sos.diagnose()
+        if sos.opts.diagnose:
+            sos.diagnose()
 
-    sos.prework()
-    sos.setup()
+        sos.prework()
+        sos.setup()
 
-    print _(" Running plugins. Please wait ...")
-    print
+        print _(" Running plugins. Please wait ...")
+        print
 
-    sos.copy_stuff()
+        sos.copy_stuff()
 
-    print
+        print
 
-    if sos.opts.report:
-        sos.report()
-        sos.html_report()
-        sos.plain_report()
+        if sos.opts.report:
+            sos.report()
+            sos.html_report()
+            sos.plain_report()
 
-    sos.postproc()
+        sos.postproc()
 
-    sos.final_work()
+        sos.final_work()
+    except SystemExit:
+        pass
