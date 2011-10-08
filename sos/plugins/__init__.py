@@ -166,7 +166,7 @@ class Plugin(object):
                 return True
         return False
 
-    def copy_symlink(self, srcpath):
+    def copy_symlink(self, srcpath, sub=None):
         link = os.readlink(srcpath)
         if not os.path.isabs(link):
             link = os.path.normpath(
@@ -179,17 +179,21 @@ class Plugin(object):
             self.soslog.debug("link %s is a directory, skipping..." % link)
             return
 
-        self.archive.add_file(link, dest=srcpath)
+        if sub:
+            old, new = sub
+            dest = srcpath.replace(old, new)
+
+        self.archive.add_file(link, dest=dest)
 
         self.copiedFiles.append({
             'srcpath':srcpath,
-            'dstpath':srcpath,
+            'dstpath':dest,
             'symlink':"yes",
             'pointsto':link})
 
-    def copy_dir(self, srcpath):
+    def copy_dir(self, srcpath, sub=None):
         for afile in os.listdir(srcpath):
-            self.doCopyFileOrDir(os.path.join(srcpath, afile), dest=None, sub=None)
+            self.doCopyFileOrDir(os.path.join(srcpath, afile), dest=None, sub=sub)
 
     def _get_dest_for_srcpath(self, srcpath):
         for copied in self.copiedFiles:
@@ -230,11 +234,11 @@ class Plugin(object):
             dest = srcpath.replace(old, new)
 
         if os.path.islink(srcpath):
-            self.copy_symlink(srcpath)
+            self.copy_symlink(srcpath, sub=sub)
             return
         else:
             if os.path.isdir(srcpath):
-                self.copy_dir(srcpath)
+                self.copy_dir(srcpath, sub=sub)
                 return
 
         # if we get here, it's definitely a regular file (not a symlink or dir)
