@@ -127,6 +127,9 @@ def parse_options(opts):
     parser.add_option("-v", "--verbose", action="count",
                          dest="verbosity",
                          help="increase verbosity")
+    parser.add_option("", "--silent", action="store_true",
+                         dest="silent", default=False,
+                         help="Only display FATAL errors on stdout")
     parser.add_option("--debug", action="count",
                          dest="debug",
                          help="enabling debugging through python debugger")
@@ -229,7 +232,7 @@ class XmlReport(object):
         if not self.enabled:
             return
 
-        print self.doc.serialize(None,  1)
+        self.ui_log.info(self.doc.serialize(None,  1))
 
     def serialize_to_file(self, fname):
         """ Serializes to file """
@@ -286,7 +289,7 @@ No changes will be made to your system.
 
 
     def print_header(self):
-        print "\n%s\n" % _("sosreport (version %s)" % (__version__,))
+        self.ui_log.info("\n%s\n" % _("sosreport (version %s)" % (__version__,)))
 
     def get_commons(self):
         return {
@@ -347,7 +350,7 @@ No changes will be made to your system.
     def _exit_nice(self):
         for plugname, plugin in self.loaded_plugins:
             plugin.exit_please()
-        print "All processes ended, cleaning up."
+        self.ui_log.info("All processes ended, cleaning up.")
         self._exit(1)
 
     def get_exit_handler(self):
@@ -367,39 +370,20 @@ No changes will be made to your system.
             pass
 
     def _setup_logging(self):
-        self.soslog = logging.getLogger('sos')
-        self.soslog.setLevel(logging.DEBUG)
-
-        logging.VERBOSE  = logging.INFO - 1
-        logging.VERBOSE2 = logging.INFO - 2
-        logging.VERBOSE3 = logging.INFO - 3
-        logging.addLevelName(logging.VERBOSE, "verbose")
-        logging.addLevelName(logging.VERBOSE2,"verbose2")
-        logging.addLevelName(logging.VERBOSE3,"verbose3")
-
-        if self.opts.profiler:
-            self.proflog = logging.getLogger('sosprofile')
-            self.proflog.setLevel(logging.DEBUG)
 
         # if stdin is not a tty, disable colors and don't ask questions
         if not sys.stdin.isatty():
             self.opts.nocolors = True
             self.opts.batch = True
 
-        # log to a file
+        self.soslog = logging.getLogger('sos')
+        self.soslog.setLevel(logging.DEBUG)
+
         self.sos_log_file = tempfile.NamedTemporaryFile()
         flog = logging.FileHandler(self.sos_log_file.name)
         flog.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
         flog.setLevel(logging.INFO)
         self.soslog.addHandler(flog)
-
-        if self.opts.profiler:
-            # setup profile log
-            self.sos_profile_log_file = tempfile.NamedTemporaryFile()
-            plog = logging.FileHandler(self.sos_profile_log_file.name)
-            plog.setFormatter(logging.Formatter('%(message)s'))
-            plog.setLevel(logging.DEBUG)
-            self.proflog.addHandler(plog)
 
         # define a Handler which writes INFO messages or higher to the sys.stderr
         console = logging.StreamHandler(sys.stderr)
@@ -409,8 +393,34 @@ No changes will be made to your system.
             console.setLevel(logging.INFO)
         else:
             console.setLevel(logging.FATAL)
+
         console.setFormatter(logging.Formatter('%(message)s'))
         self.soslog.addHandler(console)
+
+        self.ui_log = logging.getLogger('sos.ui')
+        self.ui_log.setLevel(logging.INFO)
+
+        self.sos_ui_log_file = tempfile.NamedTemporaryFile()
+        ui_fhandler = logging.FileHandler(self.sos_ui_log_file.name)
+        ui_fhandler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
+        ui_console = logging.StreamHandler(sys.stdout)
+        ui_console.setFormatter(logging.Formatter('%(message)s'))
+        if self.opts.silent:
+            ui_console.setLevel(logging.FATAL)
+        else:
+            ui_console.setLevel(logging.INFO)
+        self.ui_log.addHandler(ui_fhandler)
+        self.ui_log.addHandler(ui_console)
+
+
+        if self.opts.profiler:
+            self.proflog = logging.getLogger('sosprofile')
+            self.proflog.setLevel(logging.DEBUG)
+            self.sos_profile_log_file = tempfile.NamedTemporaryFile()
+            plog = logging.FileHandler(self.sos_profile_log_file.name)
+            plog.setFormatter(logging.Formatter('%(message)s'))
+            plog.setLevel(logging.DEBUG)
+            self.proflog.addHandler(plog)
 
     def _finish_logging(self):
         if getattr(self, "sos_log_file", None):
@@ -419,6 +429,9 @@ No changes will be made to your system.
         if getattr(self, "sos_profile_log_file", None):
             self.sos_profile_log_file.flush()
             self.archive.add_file(self.sos_profile_log_file.name, dest=os.path.join('sos_logs', 'profile.log'))
+        if getattr(self, "sos_ui_log_file", None):
+            self.sos_ui_log_file.flush()
+            self.archive.add_file(self.sos_ui_log_file.name, dest=os.path.join('sos_logs', 'ui.log'))
         logging.shutdown()
 
     def _get_disabled_plugins(self):
@@ -581,26 +594,26 @@ No changes will be made to your system.
             self._exit(1)
 
         if self.loaded_plugins:
-            print _("The following plugins are currently enabled:")
-            print
+            self.ui_log.info(_("The following plugins are currently enabled:"))
+            self.ui_log.info("")
             for (plugname, plug) in self.loaded_plugins:
-                print " %-15s %s" % (plugname, plug.get_description())
+                self.ui_log.info(" %-15s %s" % (plugname, plug.get_description()))
         else:
-            print _("No plugin enabled.")
-        print
+            self.ui_log.info(_("No plugin enabled."))
+        self.ui_log.info("")
 
         if self.skipped_plugins:
-            print _("The following plugins are currently disabled:")
-            print
+            self.ui_log.info(_("The following plugins are currently disabled:"))
+            self.ui_log.info("")
             for (plugname, plugclass, reason) in self.skipped_plugins:
-                print " %-15s %-14s %s" % (plugname,
+                self.ui_log.info(" %-15s %-14s %s" % (plugname,
                                      reason,
-                                     plugclass.get_description())
-        print
+                                     plugclass.get_description()))
+        self.ui_log.info("")
 
         if self.all_options:
-            print _("The following plugin options are available:")
-            print
+            self.ui_log.info(_("The following plugin options are available:"))
+            self.ui_log.info("")
             for (plug, plugname, optname, optparm)  in self.all_options:
                 # format and colorize option value based on its type (int or bool)
                 if type(optparm["enabled"]) == bool:
@@ -611,23 +624,23 @@ No changes will be made to your system.
                 else:
                     tmpopt = optparm["enabled"]
 
-                print " %-25s %-15s %s" % (plugname + "." + optname,
-                                          tmpopt, optparm["desc"])
+                self.ui_log.info(" %-25s %-15s %s" % (
+                    plugname + "." + optname, tmpopt, optparm["desc"]))
         else:
-            print _("No plugin options available.")
+            self.ui_log.info(_("No plugin options available."))
 
-        print
+        self.ui_log.info("")
         self._exit()
 
     def batch(self):
         if self.opts.batch:
-            print self.msg
+            self.ui_log.info(self.msg)
         else:
             self.msg += _("Press ENTER to continue, or CTRL-C to quit.\n")
             try:
                 raw_input(self.msg)
             except:
-                print
+                self.ui_log.info("")
                 self._exit()
 
     def _log_plugin_exception(self, plugin_name):
@@ -646,10 +659,10 @@ No changes will be made to your system.
 
             tmpcount += len(plug.diagnose_msgs)
         if tmpcount > 0:
-            print _("One or more plugins have detected a problem in your "
-                    "configuration.")
-            print _("Please review the following messages:")
-            print
+            self.ui_log.info(_("One or more plugins have detected a problem in your "
+                "configuration."))
+            self.ui_log.info(_("Please review the following messages:"))
+            self.ui_log.info("")
 
             fp = open(os.path.join(rptdir, "diagnose.txt"), "w")
             for plugname, plug in self.loaded_plugins:
@@ -660,20 +673,20 @@ No changes will be made to your system.
                     fp.write("%s: %s\n" % (plugname, plug.diagnose_msgs[tmpcount2]))
             fp.close()
 
-            print
+            self.ui_log.info("")
             if not self.opts.batch:
                 try:
                     while True:
                         yorno = raw_input( _("Are you sure you would like to "
                                              "continue (y/n) ? ") )
                         if yorno == _("y") or yorno == _("Y"):
-                            print
+                            self.ui_log.info("")
                             break
                         elif yorno == _("n") or yorno == _("N"):
                             self._exit(0)
                     del yorno
                 except KeyboardInterrupt:
-                    print
+                    self.ui_log.info("")
                     self._exit(0)
 
     def prework(self):
@@ -681,7 +694,7 @@ No changes will be made to your system.
             self.policy.preWork()
             self._set_archive()
         except Exception, e:
-            print e
+            self.ui_log.info(e)
             self._exit(0)
 
     def setup(self):
@@ -702,10 +715,9 @@ No changes will be made to your system.
         for i in izip(self.loaded_plugins):
             plugruncount += 1
             plugname, plug = i[0]
-            sys.stdout.write("\r  Running %d/%d: %s...        " % (plugruncount,
-                                                                  len(self.loaded_plugins),
-                                                                  plugname))
-            sys.stdout.flush()
+            if not self.opts.silent:
+                sys.stdout.write("\r  Running %d/%d: %s...        " % (plugruncount, len(self.loaded_plugins), plugname))
+                sys.stdout.flush()
             try:
                 plug.copyStuff()
             except KeyboardInterrupt:
@@ -853,6 +865,7 @@ No changes will be made to your system.
 def main(args):
     """The main entry point"""
     try:
+        log = logging.getLogger('sos.ui')
         sos = SoSReport(args)
 
         if sos.opts.listPlugins:
@@ -867,12 +880,12 @@ def main(args):
         sos.prework()
         sos.setup()
 
-        print _(" Running plugins. Please wait ...")
-        print
+        log.info(_(" Running plugins. Please wait ..."))
+        log.info("")
 
         sos.copy_stuff()
 
-        print
+        log.info("")
 
         if sos.opts.report:
             sos.report()

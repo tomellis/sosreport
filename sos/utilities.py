@@ -386,10 +386,13 @@ def compress(archive, method):
             command = shlex.split("%s %s" % (cmd,archive.name()))
             p = Popen(command, stdout=PIPE, stderr=PIPE, bufsize=-1)
             stdout, stderr = p.communicate()
-            print stdout
-            print stderr
+            log = logging.getLogger('sos')
+            if stdout:
+                log.info(stdout)
+            if stderr:
+                log.error(stderr)
             compressed = True
-            return archive.name() + "." + cmd
+            return archive.name() + "." + cmd.replace('ip','')
         except Exception, e:
             last_error = e
 
