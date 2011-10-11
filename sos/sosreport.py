@@ -405,21 +405,12 @@ No changes will be made to your system.
 
         # main soslog
         self.soslog = logging.getLogger('sos')
-
-        # in the jython world things seem to hang around between runs
-        # so lets remove all handlers first:
-        for h in self.soslog.handlers:
-            self.soslog.removeHandler(h)
-
         self.soslog.setLevel(logging.DEBUG)
-
         self.sos_log_file = self.get_temp_file()
         self.sos_log_file.close()
-
         flog = logging.FileHandler(self.sos_log_file.name)
         flog.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
         flog.setLevel(logging.INFO)
-
         self.soslog.addHandler(flog)
 
         if not self.opts.silent:
@@ -435,15 +426,9 @@ No changes will be made to your system.
 
         # ui log
         self.ui_log = logging.getLogger('sos.ui')
-
-        for h in self.ui_log.handlers:
-            self.ui_log.removeHandler(h)
-
         self.ui_log.setLevel(logging.INFO)
-
         self.sos_ui_log_file = self.get_temp_file()
         self.sos_ui_log_file.close()
-
         ui_fhandler = logging.FileHandler(self.sos_ui_log_file.name)
         ui_fhandler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
 
@@ -458,8 +443,6 @@ No changes will be made to your system.
         # profile logging
         if self.opts.profiler:
             self.proflog = logging.getLogger('sosprofile')
-            for h in self.proflog.handlers:
-                self.proflog.removeHandler(h)
             self.proflog.setLevel(logging.DEBUG)
             self.sos_profile_log_file = self.get_temp_file()
             plog = logging.FileHandler(self.sos_profile_log_file.name)
@@ -469,6 +452,13 @@ No changes will be made to your system.
 
     def _finish_logging(self):
         logging.shutdown()
+
+        # the logging module seems to persist in the jython/jboss/eap world
+        # so the handlers need to be removed
+        for logger in [logging.getLogger(x) for x in ('sos', 'sosprofile', 'sos.ui')]:
+            for h in logger.handlers:
+                logger.removeHandler(h)
+
         if getattr(self, "sos_log_file", None):
             self.archive.add_file(self.sos_log_file.name, dest=os.path.join('sos_logs', 'sos.log'))
         if getattr(self, "sos_profile_log_file", None):
