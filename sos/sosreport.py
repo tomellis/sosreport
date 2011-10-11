@@ -66,18 +66,22 @@ class TempFileUtil(object):
 
     def new(self):
        fd, fname = tempfile.mkstemp(dir=self.tmp_dir)
-       fobj = open(fname, mode="w")
-       self.files.append(fobj)
+       fobj = open(fname, 'w')
+       self.files.append((fname, fobj))
        return fobj
 
     def clean(self):
-        for f in self.files:
+        for f, fname in self.files:
             try:
                 f.flush()
                 f.close()
-                os.unlink(f.name)
             except Exception, e:
-                print e
+                pass
+            try:
+                os.unlink(fname)
+            except Exception, e:
+                pass
+        self.files = []
 
 
 class OptionParserExtended(OptionParser):
@@ -401,12 +405,21 @@ No changes will be made to your system.
 
         # main soslog
         self.soslog = logging.getLogger('sos')
+
+        # in the jython world things seem to hang around between runs
+        # so lets remove all handlers first:
+        for h in self.soslog.handlers:
+            self.soslog.removeHandler(h)
+
         self.soslog.setLevel(logging.DEBUG)
 
-        self.sos_log_file = self.tempfile_util.new()
+        self.sos_log_file = self.get_temp_file()
+        self.sos_log_file.close()
+
         flog = logging.FileHandler(self.sos_log_file.name)
         flog.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
         flog.setLevel(logging.INFO)
+
         self.soslog.addHandler(flog)
 
         if not self.opts.silent:
@@ -422,11 +435,18 @@ No changes will be made to your system.
 
         # ui log
         self.ui_log = logging.getLogger('sos.ui')
+
+        for h in self.ui_log.handlers:
+            self.ui_log.removeHandler(h)
+
         self.ui_log.setLevel(logging.INFO)
 
-        self.sos_ui_log_file = self.tempfile_util.new()
+        self.sos_ui_log_file = self.get_temp_file()
+        self.sos_ui_log_file.close()
+
         ui_fhandler = logging.FileHandler(self.sos_ui_log_file.name)
         ui_fhandler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
+
         self.ui_log.addHandler(ui_fhandler)
 
         if not self.opts.silent:
@@ -438,24 +458,23 @@ No changes will be made to your system.
         # profile logging
         if self.opts.profiler:
             self.proflog = logging.getLogger('sosprofile')
+            for h in self.proflog.handlers:
+                self.proflog.removeHandler(h)
             self.proflog.setLevel(logging.DEBUG)
-            self.sos_profile_log_file = self.tempfile_util.new()
+            self.sos_profile_log_file = self.get_temp_file()
             plog = logging.FileHandler(self.sos_profile_log_file.name)
             plog.setFormatter(logging.Formatter('%(message)s'))
             plog.setLevel(logging.DEBUG)
             self.proflog.addHandler(plog)
 
     def _finish_logging(self):
+        logging.shutdown()
         if getattr(self, "sos_log_file", None):
-            self.sos_log_file.flush()
             self.archive.add_file(self.sos_log_file.name, dest=os.path.join('sos_logs', 'sos.log'))
         if getattr(self, "sos_profile_log_file", None):
-            self.sos_profile_log_file.flush()
             self.archive.add_file(self.sos_profile_log_file.name, dest=os.path.join('sos_logs', 'profile.log'))
         if getattr(self, "sos_ui_log_file", None):
-            self.sos_ui_log_file.flush()
             self.archive.add_file(self.sos_ui_log_file.name, dest=os.path.join('sos_logs', 'ui.log'))
-        logging.shutdown()
 
     def _get_disabled_plugins(self):
         disabled = []
@@ -805,7 +824,7 @@ No changes will be made to your system.
 
     def html_report(self):
         # Generate the header for the html output file
-        rfd = self.tempfile_util.new()
+        rfd = self.get_temp_file()
         rfd.write("""
         <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
         <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
