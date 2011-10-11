@@ -38,19 +38,18 @@ import os
 import logging
 from optparse import OptionParser, Option
 import ConfigParser
-import sos.policies
 from sos.plugins import import_plugin
 from sos.utilities import ImporterHelper
 from stat import ST_UID, ST_GID, ST_MODE, ST_CTIME, ST_ATIME, ST_MTIME, S_IMODE
 from time import strftime, localtime
 from collections import deque
 from itertools import izip
-import zipfile
 import textwrap
 import tempfile
 
 from sos import _sos as _
 from sos import __version__
+import sos.policies
 from sos.utilities import TarFileArchive, ZipFileArchive, compress
 from sos.reporting import Report, Section, Command, CopiedFile, CreatedFile, Alert, Note, PlainTextReport
 
@@ -58,6 +57,27 @@ if os.path.isfile('/etc/fedora-release'):
     __distro__ = 'Fedora'
 else:
     __distro__ = 'Red Hat Enterprise Linux'
+
+class TempFileUtil(object):
+
+    def __init__(self, tmp_dir):
+        self.tmp_dir = tmp_dir
+        self.files = []
+
+    def new(self):
+       fd, fname = tempfile.mkstemp(dir=self.tmp_dir)
+       fobj = open(fname, mode="w")
+       self.files.append(fobj)
+       return fobj
+
+    def clean(self):
+        for f in self.files:
+            try:
+                f.flush()
+                f.close()
+                os.unlink(f.name)
+            except Exception, e:
+                print e
 
 
 class OptionParserExtended(OptionParser):
@@ -275,6 +295,7 @@ No changes will be made to your system.
         self._is_root = (os.getuid() == 0)
 
         self.opts, self.args = parse_options(opts)
+        self.tempfile_util = TempFileUtil(tmp_dir=self.opts.tmp_dir)
         self._set_debug()
         self._read_config()
         self.policy = sos.policies.load()
@@ -303,6 +324,9 @@ No changes will be made to your system.
                 'cmdlineopts': self.opts,
                 'config': self.config
                 }
+
+    def get_temp_file(self):
+        return self.tempfile_util.new()
 
     def _set_archive(self):
         if self.opts.compression_type not in ('auto', 'zip', 'bzip2', 'gzip', 'xz'):
@@ -371,52 +395,51 @@ No changes will be made to your system.
 
     def _setup_logging(self):
 
-        # if stdin is not a tty, disable colors and don't ask questions
         if not sys.stdin.isatty():
             self.opts.nocolors = True
             self.opts.batch = True
 
+        # main soslog
         self.soslog = logging.getLogger('sos')
         self.soslog.setLevel(logging.DEBUG)
 
-        self.sos_log_file = tempfile.NamedTemporaryFile()
+        self.sos_log_file = self.tempfile_util.new()
         flog = logging.FileHandler(self.sos_log_file.name)
         flog.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
         flog.setLevel(logging.INFO)
         self.soslog.addHandler(flog)
 
-        # define a Handler which writes INFO messages or higher to the sys.stderr
-        console = logging.StreamHandler(sys.stderr)
-        if self.opts.verbosity > 1:
-            console.setLevel(logging.DEBUG)
-        elif self.opts.verbosity > 0:
-            console.setLevel(logging.INFO)
-        else:
-            console.setLevel(logging.FATAL)
+        if not self.opts.silent:
+            console = logging.StreamHandler(sys.stderr)
+            console.setFormatter(logging.Formatter('%(message)s'))
+            if self.opts.verbosity > 1:
+                console.setLevel(logging.DEBUG)
+            elif self.opts.verbosity > 0:
+                console.setLevel(logging.INFO)
+            else:
+                console.setLevel(logging.FATAL)
+            self.soslog.addHandler(console)
 
-        console.setFormatter(logging.Formatter('%(message)s'))
-        self.soslog.addHandler(console)
-
+        # ui log
         self.ui_log = logging.getLogger('sos.ui')
         self.ui_log.setLevel(logging.INFO)
 
-        self.sos_ui_log_file = tempfile.NamedTemporaryFile()
+        self.sos_ui_log_file = self.tempfile_util.new()
         ui_fhandler = logging.FileHandler(self.sos_ui_log_file.name)
         ui_fhandler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
-        ui_console = logging.StreamHandler(sys.stdout)
-        ui_console.setFormatter(logging.Formatter('%(message)s'))
-        if self.opts.silent:
-            ui_console.setLevel(logging.FATAL)
-        else:
-            ui_console.setLevel(logging.INFO)
         self.ui_log.addHandler(ui_fhandler)
-        self.ui_log.addHandler(ui_console)
 
+        if not self.opts.silent:
+            ui_console = logging.StreamHandler(sys.stdout)
+            ui_console.setFormatter(logging.Formatter('%(message)s'))
+            ui_console.setLevel(logging.INFO)
+            self.ui_log.addHandler(ui_console)
 
+        # profile logging
         if self.opts.profiler:
             self.proflog = logging.getLogger('sosprofile')
             self.proflog.setLevel(logging.DEBUG)
-            self.sos_profile_log_file = tempfile.NamedTemporaryFile()
+            self.sos_profile_log_file = self.tempfile_util.new()
             plog = logging.FileHandler(self.sos_profile_log_file.name)
             plog.setFormatter(logging.Formatter('%(message)s'))
             plog.setLevel(logging.DEBUG)
@@ -710,6 +733,17 @@ No changes will be made to your system.
                 else:
                     self._log_plugin_exception(plugname)
 
+    def version(self):
+        """Fetch version information from all plugins and store in the report
+        version file"""
+
+        versions = []
+        versions.append("sosreport: %s" % __version__)
+        for plugname, plug in self.loaded_plugins:
+            versions.append("%s: %s" % (plugname, plug.version))
+        self.archive.add_string(content="\n".join(versions), dest='version.txt')
+
+
     def copy_stuff(self):
         plugruncount = 0
         for i in izip(self.loaded_plugins):
@@ -763,7 +797,7 @@ No changes will be made to your system.
 
             report.add(section)
 
-        fd = tempfile.NamedTemporaryFile()
+        fd = self.get_temp_file()
         fd.write(str(PlainTextReport(report)))
         fd.flush()
         self.archive.add_file(fd.name, dest=os.path.join('sos_reports', 'sos.txt'))
@@ -771,7 +805,7 @@ No changes will be made to your system.
 
     def html_report(self):
         # Generate the header for the html output file
-        rfd = tempfile.NamedTemporaryFile()
+        rfd = self.tempfile_util.new()
         rfd.write("""
         <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
         <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
@@ -830,7 +864,6 @@ No changes will be made to your system.
         rfd.flush()
 
         self.archive.add_file(rfd.name, dest=os.path.join('sos_reports', 'sos.html'))
-        rfd.close()
 
     def postproc(self):
         for plugname, plug in self.loaded_plugins:
@@ -857,6 +890,8 @@ No changes will be made to your system.
         else:
             self.policy.uploadResults(final_filename)
 
+        self.tempfile_util.clean()
+
     def ensure_plugins(self):
         if not self.loaded_plugins:
             self.soslog.error(_("no valid plugins were enabled"))
@@ -865,7 +900,6 @@ No changes will be made to your system.
 def main(args):
     """The main entry point"""
     try:
-        log = logging.getLogger('sos.ui')
         sos = SoSReport(args)
 
         if sos.opts.listPlugins:
@@ -880,12 +914,12 @@ def main(args):
         sos.prework()
         sos.setup()
 
-        log.info(_(" Running plugins. Please wait ..."))
-        log.info("")
+        sos.ui_log.info(_(" Running plugins. Please wait ..."))
+        sos.ui_log.info("")
 
         sos.copy_stuff()
 
-        log.info("")
+        sos.ui_log.info("")
 
         if sos.opts.report:
             sos.report()
@@ -893,6 +927,7 @@ def main(args):
             sos.plain_report()
 
         sos.postproc()
+        sos.version()
 
         sos.final_work()
     except SystemExit:

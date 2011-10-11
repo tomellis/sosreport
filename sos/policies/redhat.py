@@ -26,7 +26,6 @@ import random
 import re
 import platform
 import time
-import logging
 from subprocess import Popen, PIPE, call
 from collections import deque
 
@@ -97,7 +96,6 @@ class RHELPolicy(Policy):
         self.ticketNumber = ""
         self._parse_uname()
         self.package_manager = RHELPackageManager()
-        self.ui_log = logging.getLogger('sos.ui')
 
     def setCommons(self, commons):
         self.cInfo = commons
@@ -208,9 +206,9 @@ class RHELPolicy(Policy):
 
                 self.ticketNumber = raw_input(_("Please enter the case number that you are generating this report for: "))
                 self.ticketNumber = re.sub(r"[^0-9]", "", self.ticketNumber)
-                self.ui_log.info('')
+                print
             except:
-                self.ui_log.info('')
+                print
                 sys.exit(0)
 
         if len(self.reportName) == 0:
@@ -227,7 +225,7 @@ class RHELPolicy(Policy):
         return
 
     def packageResults(self, archive_filename):
-        self.ui_log.info(_("Creating compressed archive..."))
+        print _("Creating compressed archive...")
         self.report_file = archive_filename
         # actually compress the archive if necessary
 
@@ -244,7 +242,7 @@ class RHELPolicy(Policy):
         if not self.report_file:
            return False
 
-        self.ui_log.info(_("Encrypting archive..."))
+        print _("Encrypting archive...")
         gpgname = self.report_file + ".gpg"
 
         try:
@@ -264,7 +262,7 @@ class RHELPolicy(Policy):
             os.unlink(self.report_file)
             self.report_file = gpgname
         else:
-           self.ui_log.info(_("There was a problem encrypting your report."))
+           print _("There was a problem encrypting your report.")
            sys.exit(1)
 
     def displayResults(self, final_filename=None):
@@ -285,14 +283,14 @@ class RHELPolicy(Policy):
         fp.write(self.report_md5 + "\n")
         fp.close()
 
-        self.ui_log.info('')
-        self.ui_log.info(_("Your sosreport has been generated and saved in:\n  %s") % self.report_file)
-        self.ui_log.info('')
+        print
+        print _("Your sosreport has been generated and saved in:\n  %s") % self.report_file
+        print
         if len(self.report_md5):
-            self.ui_log.info(_("The md5sum is: ") + self.report_md5)
-            self.ui_log.info('')
-        self.ui_log.info(_("Please send this file to your support representative."))
-        self.ui_log.info('')
+            print _("The md5sum is: ") + self.report_md5
+            print
+        print _("Please send this file to your support representative.")
+        print
 
     def uploadResults(self):
 
@@ -302,7 +300,7 @@ class RHELPolicy(Policy):
         if not self.report_file:
             return False
 
-        self.ui_log.info('')
+        print
         # make sure it's readable
         try:
             fp = open(self.report_file, "r")
@@ -316,14 +314,14 @@ class RHELPolicy(Policy):
             try:
                upload_url = self.cInfo['config'].get("general", "ftp_upload_url")
             except:
-               self.ui_log.info(_("No URL defined in config file."))
+               print _("No URL defined in config file.")
                return
 
         from urlparse import urlparse
         url = urlparse(upload_url)
 
         if url[0] != "ftp":
-            self.ui_log.info(_("Cannot upload to specified URL."))
+            print _("Cannot upload to specified URL.")
             return
 
         # extract username and password from URL, if present
@@ -360,13 +358,13 @@ class RHELPolicy(Policy):
             ftp.storbinary('STOR %s' % upload_name, fp)
             ftp.quit()
         except:
-            self.ui_log.info(_("There was a problem uploading your report to Red Hat support."))
+            print _("There was a problem uploading your report to Red Hat support.")
         else:
-            self.ui_log.info(_("Your report was successfully uploaded to %s with name:" % (upload_url,)))
-            self.ui_log.info("  " + upload_name)
-            self.ui_log.info('')
-            self.ui_log.info(_("Please communicate this name to your support representative."))
-            self.ui_log.info('')
+            print _("Your report was successfully uploaded to %s with name:" % (upload_url,))
+            print "  " + upload_name
+            print
+            print _("Please communicate this name to your support representative.")
+            print
 
         fp.close()
 

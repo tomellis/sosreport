@@ -18,6 +18,8 @@ class EAP6(Plugin, IndependentPlugin):
 
     requires_root = False
 
+    version = "1.0"
+
     optionList = [
           ("home",  "JBoss's installation dir (i.e. JBOSS_HOME)", '', False),
           ("logsize", 'max size (MiB) to collect per log file', '', 15),

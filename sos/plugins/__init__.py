@@ -82,6 +82,7 @@ class Plugin(object):
     """
 
     requires_root = True
+    version = 'unversioned'
 
     def __init__(self, commons):
         if not getattr(self, "optionList", False):
@@ -506,13 +507,13 @@ class Plugin(object):
         return True
 
     def diagnose(self):
-        """This class must be overridden to check the sanity of the system's
+        """This method must be overridden to check the sanity of the system's
         configuration before the collection begins.
         """
         pass
 
     def setup(self):
-        """This class must be overridden to add the copyPaths, forbiddenPaths,
+        """This method must be overridden to add the copyPaths, forbiddenPaths,
         and external programs to be collected at a minimum.
         """
         pass
