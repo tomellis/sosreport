@@ -23,7 +23,14 @@ class Request(object):
         self.parameters = parameters
 
     def url_parts(self):
+        """Generator function to split a url into (key, value) tuples. The url
+        should contain an even number of pairs.  In the case of / the generator
+        will immediately stop iteration."""
+        if self.resource == "/":
+            raise StopIteration
+
         parts = self.resource.lstrip("/").split("/")
+
         while parts:
             yield (parts.pop(0), parts.pop(0))
 
@@ -134,7 +141,9 @@ class EAP6(Plugin, IndependentPlugin):
     def query(self, request_obj):
         try:
             return self.query_java(request_obj)
-        except ImportError, e:
+        # ImportError is when we try to import java stuff
+        # AttributeError is when we try to access sos.controllerClient
+        except (ImportError, AttributeError):
             return self.query_http(request_obj)
 
     def query_java(self, request_obj):
@@ -153,7 +162,7 @@ class EAP6(Plugin, IndependentPlugin):
 
         return sos.controllerClient.execute(request).toJSONString(True)
 
-    def query_http(self, request_obj, postdata=None, headers=None):
+    def query_http(self, request_obj, postdata=None):
         try:
             import json
         except ImportError:
@@ -164,19 +173,18 @@ class EAP6(Plugin, IndependentPlugin):
 
         uri = "http://" + host_port + "/management" + request_obj.resource + "?"
 
-        if request_obj.operation != "read-resource":
-            json_data = {'operation': request_obj.operation,
-                         'address': []}
+        json_data = {'operation': request_obj.operation,
+                     'address': []}
 
-            for key, val in request_obj.url_parts():
-                json_data['address'].append({key:val})
+        for key, val in request_obj.url_parts():
+            json_data['address'].append({key:val})
 
-            for key, val in request_obj.parameters.iteritems():
-                json_data[key] = val
+        for key, val in request_obj.parameters.iteritems():
+            json_data[key] = val
 
-            postdata = json.dumps(json_data)
-            headers = {'Content-Type': 'application/json',
-                       'Accept': 'application/json'}
+        postdata = json.dumps(json_data)
+        headers = {'Content-Type': 'application/json',
+                   'Accept': 'application/json'}
 
         opener = urllib2.build_opener()
 
@@ -194,9 +202,6 @@ class EAP6(Plugin, IndependentPlugin):
 
             opener.add_handler(digest_auth_handler)
             opener.add_handler(basic_auth_handler)
-
-        if not headers:
-            headers = {}
 
         req = urllib2.Request(uri, data=postdata, headers=headers)
 
@@ -217,10 +222,10 @@ class EAP6(Plugin, IndependentPlugin):
         import pprint
 
         for caller, outfile in [
-                (Request(resource="/core-service/platform-mbean/type/runtime"), "runtime.txt"),
                 (Request(resource="/core-service/platform-mbean/type/threading",
                         operation="dump-all-threads",
                         parameters={"locked-synchronizers": "true", "locked-monitors": "true"}), "threaddump.txt"),
+                (Request(resource="/", parameters={"recursive": "true"}), "configuration.txt"),
                 ]:
             self.addStringAsFile(pprint.pformat(self.query(caller)), filename=outfile)
 
