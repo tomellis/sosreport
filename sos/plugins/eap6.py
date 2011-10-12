@@ -8,9 +8,25 @@ import subprocess
 import string
 import grp, pwd
 import urllib2
+import logging
 
 from sos.plugins import Plugin, IndependentPlugin
 from sos.utilities import DirTree, find, md5sum
+
+logger = logging.getLogger('sos')
+
+class Request(object):
+
+    def __init__(self, resource, operation="read-resource", parameters=None):
+        self.resource = resource
+        self.operation = operation
+        self.parameters = parameters
+
+    def url_parts(self):
+        parts = self.resource.lstrip("/").split("/")
+        while parts:
+            yield (parts.pop(0), parts.pop(0))
+
 
 class EAP6(Plugin, IndependentPlugin):
     """JBoss related information
@@ -114,29 +130,53 @@ class EAP6(Plugin, IndependentPlugin):
         else:
             self.addAlert("WARN: No jars found in JBoss system path (" + path + ").")
 
-    def query_api(self, url):
-        try:
-            return self.query_java(url)
-        except Exception, e:
-            return self.query_http(url)
 
-    def query_java(self, url):
+    def query(self, request_obj):
         try:
-            raise Exception
-        except Exception, e:
-            pass
-            # throw exception to do http stuff
+            return self.query_java(request_obj)
+        except ImportError, e:
+            return self.query_http(request_obj)
 
-    def query_http(self, url, postdata=None):
+    def query_java(self, request_obj):
+        from org.jboss.dmr import ModelNode
+        import sos
+
+        request = ModelNode()
+        request.get("operation").set(request_obj.operation)
+
+        for key, val in request_obj.url_parts():
+            request.get('address').add(key,val)
+
+        if request_obj.parameters:
+            for key, value in request_obj.parameters.iteritems():
+                request.get(key).set(value)
+
+        return sos.controllerClient.execute(request).toJSONString(True)
+
+    def query_http(self, request_obj, postdata=None, headers=None):
         try:
             import json
         except ImportError:
             import simplejson as json
-
         host_port = self.getOption('address')
         username = self.getOption('user')
         password = self.getOption('pass')
-        uri = "http://" + host_port + "/management" + url
+
+        uri = "http://" + host_port + "/management" + request_obj.resource + "?"
+
+        if request_obj.operation != "read-resource":
+            json_data = {'operation': request_obj.operation,
+                         'address': []}
+
+            for key, val in request_obj.url_parts():
+                json_data['address'].append({key:val})
+
+            for key, val in request_obj.parameters.iteritems():
+                json_data[key] = val
+
+            postdata = json.dumps(json_data)
+            headers = {'Content-Type': 'application/json',
+                       'Accept': 'application/json'}
 
         opener = urllib2.build_opener()
 
@@ -155,14 +195,19 @@ class EAP6(Plugin, IndependentPlugin):
             opener.add_handler(digest_auth_handler)
             opener.add_handler(basic_auth_handler)
 
-        req = urllib2.Request(uri, data=postdata)
+        if not headers:
+            headers = {}
+
+        req = urllib2.Request(uri, data=postdata, headers=headers)
 
         try:
             resp = opener.open(req)
             return json.loads(resp.read())
         except Exception, e:
-            self.addAlert("Could not query url: %s; error: %s" % (uri, e))
-
+            msg = "Could not query url: %s; error: %s" % (uri, e)
+            print msg
+            logger.debug(msg)
+            self.addAlert(msg)
 
     def get_online_data(self):
         """
@@ -171,11 +216,13 @@ class EAP6(Plugin, IndependentPlugin):
         """
         import pprint
 
-        for url, outfile in [
-                ("/core-service/platform-mbean/type/runtime", "runtime.txt"),
+        for caller, outfile in [
+                (Request(resource="/core-service/platform-mbean/type/runtime"), "runtime.txt"),
+                (Request(resource="/core-service/platform-mbean/type/threading",
+                        operation="dump-all-threads",
+                        parameters={"locked-synchronizers": "true", "locked-monitors": "true"}), "threaddump.txt"),
                 ]:
-            self.addStringAsFile(pprint.pformat(self.query_api(url)), filename=outfile)
-
+            self.addStringAsFile(pprint.pformat(self.query(caller)), filename=outfile)
 
     def __getFiles(self, configDirAry):
         """

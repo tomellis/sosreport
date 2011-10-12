@@ -71,7 +71,7 @@ class TempFileUtil(object):
        return fobj
 
     def clean(self):
-        for f, fname in self.files:
+        for fname, f in self.files:
             try:
                 f.flush()
                 f.close()

@@ -318,11 +318,11 @@ class ZipFileArchive(Archive):
         self._name = name
         try:
             import zlib
-            compression = zipfile.ZIP_DEFLATED
+            self.compression = zipfile.ZIP_DEFLATED
         except:
-            compression = zipfile.ZIP_STORED
+            self.compression = zipfile.ZIP_STORED
 
-        self.zipfile = zipfile.ZipFile(self.name(), mode="w", compression=compression)
+        self.zipfile = zipfile.ZipFile(self.name(), mode="w", compression=self.compression)
 
     def name(self):
         return "%s.zip" % self._name
@@ -347,7 +347,11 @@ class ZipFileArchive(Archive):
                 self.zipfile.write(src, self.prepend(src))
 
     def add_string(self, content, dest):
-        self.zipfile.writestr(self.prepend(dest), content)
+        info = zipfile.ZipInfo(self.prepend(dest),
+                date_time=time.localtime(time.time()))
+        info.compress_type = self.compression
+        info.external_attr = 0400 << 16L
+        self.zipfile.writestr(info, content)
 
     def open_file(self, name):
         try:
