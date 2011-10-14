@@ -189,6 +189,7 @@ class ImporterHelper(object):
         try:
             zf = zipfile.ZipFile(self._get_path_to_zip(path))
             candidates = self._get_plugins_from_list(zf.namelist())
+            zf.close()
             if candidates:
                 return candidates
         except IOError:

@@ -8,12 +8,9 @@ import subprocess
 import string
 import grp, pwd
 import urllib2
-import logging
 
 from sos.plugins import Plugin, IndependentPlugin
 from sos.utilities import DirTree, find, md5sum
-
-logger = logging.getLogger('sos')
 
 class Request(object):
 
@@ -209,10 +206,7 @@ class EAP6(Plugin, IndependentPlugin):
             resp = opener.open(req)
             return json.loads(resp.read())
         except Exception, e:
-            msg = "Could not query url: %s; error: %s" % (uri, e)
-            print msg
-            logger.debug(msg)
-            self.addAlert(msg)
+            self.addAlert("Could not query url: %s; error: %s" % (uri, e))
 
     def get_online_data(self):
         """

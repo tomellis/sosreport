@@ -901,6 +901,8 @@ No changes will be made to your system.
 
         self.tempfile_util.clean()
 
+        return final_filename
+
     def ensure_plugins(self):
         if not self.loaded_plugins:
             self.soslog.error(_("no valid plugins were enabled"))
@@ -938,6 +940,6 @@ def main(args):
         sos.postproc()
         sos.version()
 
-        sos.final_work()
+        return sos.final_work()
     except SystemExit:
-        pass
+        return None
