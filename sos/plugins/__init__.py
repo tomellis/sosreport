@@ -180,6 +180,8 @@ class Plugin(object):
             self.soslog.debug("link %s is a directory, skipping..." % link)
             return
 
+        dest = link
+
         if sub:
             old, new = sub
             dest = srcpath.replace(old, new)

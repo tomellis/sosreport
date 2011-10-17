@@ -292,7 +292,7 @@ class RHELPolicy(Policy):
         print _("Please send this file to your support representative.")
         print
 
-    def uploadResults(self):
+    def uploadResults(self, final_filename):
 
         self.report_file = final_filename
 
@@ -357,8 +357,8 @@ class RHELPolicy(Policy):
             ftp.set_pasv(True)
             ftp.storbinary('STOR %s' % upload_name, fp)
             ftp.quit()
-        except:
-            print _("There was a problem uploading your report to Red Hat support.")
+        except Exception, e:
+            print _("There was a problem uploading your report to Red Hat support. " + str(e))
         else:
             print _("Your report was successfully uploaded to %s with name:" % (upload_url,))
             print "  " + upload_name

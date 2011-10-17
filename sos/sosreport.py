@@ -610,7 +610,7 @@ No changes will be made to your system.
                                       self.opts.enableplugins):
             plugin_name = plugin.split(".")[0]
             if not plugin_name in self.plugin_names:
-                self.soslog.error('a non-existing plugin (%s) was specified in the '
+                self.soslog.fatal('a non-existing plugin (%s) was specified in the '
                              'command line' % (plugin_name))
                 self._exit(1)
 
@@ -622,7 +622,7 @@ No changes will be made to your system.
 
     def list_plugins(self):
         if not self.loaded_plugins and not self.skipped_plugins:
-            self.soslog.error(_("no valid plugins found"))
+            self.soslog.fatal(_("no valid plugins found"))
             self._exit(1)
 
         if self.loaded_plugins:
