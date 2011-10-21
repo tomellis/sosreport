@@ -6,7 +6,6 @@ import fnmatch
 import shlex
 import subprocess
 import string
-import grp, pwd
 import urllib2
 
 from sos.plugins import Plugin, IndependentPlugin

@@ -13,9 +13,8 @@ def load():
     policies = []
     for module in helper.get_modules():
         for policy in import_policy(module):
-            p = policy()
-            if p.check():
-                return p
+            if policy.check():
+                return policy()
     raise Exception("No policy could be loaded.")
 
 

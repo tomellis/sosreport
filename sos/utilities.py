@@ -38,8 +38,6 @@ try:
 except ImportError:
     from StringIO import StringIO
 import time
-import pwd
-import grp
 
 try:
     import hashlib as md5
@@ -92,13 +90,27 @@ class DirTree(object):
         else:
             return '%d' % n
 
+    def _get_user(self, stats):
+        try:
+            import pwd
+            return pwd.getpwuid(stats.st_uid)[0]
+        except ImportError:
+            return str(stats.st_uid)
+
+    def __get_group(self, stats):
+        try:
+            import grp
+            return grp.getgrgid(stats.st_gid)[0]
+        except ImportError:
+            return str(stats.st_uid)
+
     def _format(self, path):
         """Conditionally adds detail to paths"""
         stats = os.stat(path)
         details = {
                 "filename": os.path.basename(path),
-                "user": pwd.getpwuid(stats.st_uid)[0],
-                "group": grp.getgrgid(stats.st_gid)[0],
+                "user": self._get_user(stats),
+                "group": self._get_group(stats),
                 "filesize": self._convert_bytes(stats.st_size),
                 }
         return ("[%(user)s %(group)s %(filesize)s] " % details, "%(filename)s" % details)

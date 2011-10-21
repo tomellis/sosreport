@@ -47,6 +47,9 @@ from itertools import izip
 import textwrap
 import tempfile
 
+import subprocess
+import shlex
+
 from sos import _sos as _
 from sos import __version__
 import sos.policies
@@ -296,7 +299,7 @@ No changes will be made to your system.
         except Exception:
             pass # not available in java, but we don't care
 
-        self._is_root = (os.getuid() == 0)
+        self._is_root = self._determine_is_root()
 
         self.opts, self.args = parse_options(opts)
         self.tempfile_util = TempFileUtil(tmp_dir=self.opts.tmp_dir)
@@ -312,6 +315,22 @@ No changes will be made to your system.
         self._check_for_unknown_plugins()
         self._set_plugin_options()
 
+    def _determine_is_root(self):
+        try:
+            return (os.getuid() == 0)
+        except AttributeError:
+            # Windows detection
+            p = subprocess.Popen("whoami /groups",
+                    shell=True, stdout=subprocess.PIPE)
+            stdout = p.communicate()[0]
+            if stdout == "S-1-16-12288":
+                return True
+            else:
+                p = subprocess.Popen('net localgroup administrators | find "%USERNAME%"',
+                        shell=True, stdout=subprocess.PIPE)
+                stdout = p.communicate()[0]
+                return len(stdout) > 0
+	    
 
     def print_header(self):
         self.ui_log.info("\n%s\n" % _("sosreport (version %s)" % (__version__,)))
