@@ -97,6 +97,12 @@ class RHELPolicy(Policy):
         self._parse_uname()
         self.package_manager = RHELPackageManager()
 
+    def _print(self, msg=None):
+        """A wrapper around print that only prints if we are not running in
+        silent mode"""
+        if not self.cInfo['cmdlineopts'].silent:
+            print msg
+
     def setCommons(self, commons):
         self.cInfo = commons
 
@@ -109,20 +115,15 @@ class RHELPolicy(Policy):
         "This method checks to see if we are running on RHEL. It returns True or False."
         return os.path.isfile('/etc/redhat-release')
 
+    def is_root(self):
+        return (os.getuid() == 0)
+
     def preferedArchive(self):
         from sos.utilities import TarFileArchive
         return TarFileArchive
 
     def pkgByName(self, name):
         return self.package_manager.pkgByName(name)
-
-    def _parse_uname(self):
-        (system, node, release,
-         version, machine, processor) = platform.uname()
-        self.hostname = node
-        self.release = release
-        self.smp = version.split()[1] == "SMP"
-        self.machine = machine
 
     def _system(self, cmd):
         p = Popen(cmd,
@@ -200,16 +201,16 @@ class RHELPolicy(Policy):
         localname = self.rhnUsername()
         if len(localname) == 0: localname = self.hostName()
 
-        if not self.cInfo['cmdlineopts'].batch:
+        if not self.cInfo['cmdlineopts'].batch and not self.cInfo['cmdlineopts'].silent:
             try:
                 self.reportName = raw_input(_("Please enter your first initial and last name [%s]: ") % localname)
                 self.reportName = re.sub(r"[^a-zA-Z.0-9]", "", self.reportName)
 
                 self.ticketNumber = raw_input(_("Please enter the case number that you are generating this report for: "))
                 self.ticketNumber = re.sub(r"[^0-9]", "", self.ticketNumber)
-                print
+                self._print()
             except:
-                print
+                self._print()
                 sys.exit(0)
 
         if len(self.reportName) == 0:
@@ -226,7 +227,7 @@ class RHELPolicy(Policy):
         return
 
     def packageResults(self, archive_filename):
-        print _("Creating compressed archive...")
+        self._print(_("Creating compressed archive..."))
         self.report_file = archive_filename
         # actually compress the archive if necessary
 
@@ -243,7 +244,7 @@ class RHELPolicy(Policy):
         if not self.report_file:
            return False
 
-        print _("Encrypting archive...")
+        self._print(_("Encrypting archive..."))
         gpgname = self.report_file + ".gpg"
 
         try:
@@ -263,7 +264,7 @@ class RHELPolicy(Policy):
             os.unlink(self.report_file)
             self.report_file = gpgname
         else:
-           print _("There was a problem encrypting your report.")
+           self._print(_("There was a problem encrypting your report."))
            sys.exit(1)
 
     def displayResults(self, final_filename=None):
@@ -284,14 +285,14 @@ class RHELPolicy(Policy):
         fp.write(self.report_md5 + "\n")
         fp.close()
 
-        print
-        print _("Your sosreport has been generated and saved in:\n  %s") % self.report_file
-        print
+        self._print()
+        self._print(_("Your sosreport has been generated and saved in:\n  %s") % self.report_file)
+        self._print()
         if len(self.report_md5):
-            print _("The md5sum is: ") + self.report_md5
-            print
-        print _("Please send this file to your support representative.")
-        print
+            self._print(_("The md5sum is: ") + self.report_md5)
+            self._print()
+        self._print(_("Please send this file to your support representative."))
+        self._print()
 
     def uploadResults(self, final_filename):
 
@@ -301,7 +302,7 @@ class RHELPolicy(Policy):
         if not self.report_file:
             return False
 
-        print
+        self._print()
         # make sure it's readable
         try:
             fp = open(self.report_file, "r")
@@ -315,14 +316,14 @@ class RHELPolicy(Policy):
             try:
                upload_url = self.cInfo['config'].get("general", "ftp_upload_url")
             except:
-               print _("No URL defined in config file.")
+               self._print(_("No URL defined in config file."))
                return
 
         from urlparse import urlparse
         url = urlparse(upload_url)
 
         if url[0] != "ftp":
-            print _("Cannot upload to specified URL.")
+            self._print(_("Cannot upload to specified URL."))
             return
 
         # extract username and password from URL, if present
@@ -359,13 +360,13 @@ class RHELPolicy(Policy):
             ftp.storbinary('STOR %s' % upload_name, fp)
             ftp.quit()
         except Exception, e:
-            print _("There was a problem uploading your report to Red Hat support. " + str(e))
+            self._print(_("There was a problem uploading your report to Red Hat support. " + str(e)))
         else:
-            print _("Your report was successfully uploaded to %s with name:" % (upload_url,))
-            print "  " + upload_name
-            print
-            print _("Please communicate this name to your support representative.")
-            print
+            self._print(_("Your report was successfully uploaded to %s with name:" % (upload_url,)))
+            self._print("  " + upload_name)
+            self._print()
+            self._print(_("Please communicate this name to your support representative."))
+            self._print()
 
         fp.close()
 

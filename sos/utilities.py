@@ -169,10 +169,17 @@ class ImporterHelper(object):
         name, ext = os.path.splitext(base)
         return name
 
-    def _get_plugins_from_list(self, list_):
+    def _get_plugins_from_list(self, list_, package_path=None):
+
+        # jarfiles represent their paths with a / even on windows
+        # so we need to be able to use a different path separator
+        # in order for this to work right
+        if not package_path:
+            package_path = self.package_path
+
         plugins = [self._plugin_name(plugin)
                 for plugin in list_
-                if self.package_path in plugin
+                if package_path in plugin
                 and "__init__" not in plugin
                 and plugin.endswith(".py")]
         plugins.sort()
@@ -200,7 +207,8 @@ class ImporterHelper(object):
     def _find_plugins_in_zipfile(self, path):
         try:
             zf = zipfile.ZipFile(self._get_path_to_zip(path))
-            candidates = self._get_plugins_from_list(zf.namelist())
+            package_path = self.package_path.replace(os.path.sep, "/")
+            candidates = self._get_plugins_from_list(zf.namelist(), package_path)
             zf.close()
             if candidates:
                 return candidates
