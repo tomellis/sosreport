@@ -8,6 +8,11 @@ import subprocess
 import string
 import urllib2
 
+try:
+    import json
+except ImportError:
+    import simplejson as json
+
 from sos.plugins import Plugin, IndependentPlugin
 from sos.utilities import DirTree, find, md5sum
 
@@ -131,7 +136,7 @@ class EAP6(Plugin, IndependentPlugin):
                 for (name, checksum, manifest) in jar_info_list]),
                 'jarinfo.txt')
         else:
-            self.addAlert("WARN: No jars found in JBoss system path (" + path + ").")
+            self.addAlert("WARN: No jars found in JBoss system path (" + self.__jbossHome + ").")
 
 
     def query(self, request_obj):

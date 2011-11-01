@@ -97,7 +97,7 @@ class DirTree(object):
         except ImportError:
             return str(stats.st_uid)
 
-    def __get_group(self, stats):
+    def _get_group(self, stats):
         try:
             import grp
             return grp.getgrgid(stats.st_gid)[0]

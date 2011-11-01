@@ -465,8 +465,11 @@ class Plugin(object):
             self.doCopyFileOrDir(path, sub=sub)
 
         for string, file_name in self.copyStrings:
-            self.archive.add_string(string,
-                    os.path.join('sos_strings', self.name(), file_name))
+            try:
+                self.archive.add_string(string,
+                        os.path.join('sos_strings', self.name(), file_name))
+            except Exception, e:
+                self.soslog.debug("could not create %s, traceback follows: %s" % (file_name, e))
 
         for progs in izip(self.collectProgs):
             prog, suggest_filename, root_symlink, timeout = progs[0]
