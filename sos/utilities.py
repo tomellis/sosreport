@@ -424,4 +424,10 @@ def compress(archive, method):
     if not compressed:
         raise last_error
 
+
+def shell_out(cmd):
+    """Uses subprocess.Popen to make a system call and returns stdout.
+    Does not handle exceptions."""
+    p = Popen(cmd, shell=True, stdout=PIPE)
+    return p.communicate()[0]
 # vim:ts=4 sw=4 et

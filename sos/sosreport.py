@@ -47,18 +47,11 @@ from itertools import izip
 import textwrap
 import tempfile
 
-import subprocess
-import shlex
-
 from sos import _sos as _
 from sos import __version__
 import sos.policies
 from sos.utilities import TarFileArchive, ZipFileArchive, compress
 from sos.reporting import Report, Section, Command, CopiedFile, CreatedFile, Alert, Note, PlainTextReport
-if os.path.isfile('/etc/fedora-release'):
-    __distro__ = 'Fedora'
-else:
-    __distro__ = 'Red Hat Enterprise Linux'
 
 class TempFileUtil(object):
 
@@ -273,18 +266,6 @@ class XmlReport(object):
 
 
 class SoSReport(object):
-
-    msg = _("""This utility will collect some detailed  information about the
-hardware and setup of your %(distroa)s system.
-The information is collected and an archive is  packaged under
-/tmp, which you can send to a support representative.
-%(distrob)s will use this information for diagnostic purposes ONLY
-and it will be considered confidential information.
-
-This process may take a while to complete.
-No changes will be made to your system.
-
-""" % {'distroa':__distro__, 'distrob':__distro__})
 
     def __init__(self, opts):
         self.loaded_plugins = deque()
@@ -667,11 +648,12 @@ No changes will be made to your system.
 
     def batch(self):
         if self.opts.batch:
-            self.ui_log.info(self.msg)
+            self.ui_log.info(self.policy.get_msg)
         else:
-            self.msg += _("Press ENTER to continue, or CTRL-C to quit.\n")
+            msg = self.policy.get_msg()
+            msg += _("Press ENTER to continue, or CTRL-C to quit.\n")
             try:
-                raw_input(self.msg)
+                raw_input(msg)
             except:
                 self.ui_log.info("")
                 self._exit()
@@ -681,7 +663,7 @@ No changes will be made to your system.
 
     def diagnose(self):
         tmpcount = 0
-        for plugname, plug in GlobalVars.loadedplugins:
+        for plugname, plug in self.loaded_plugins:
             try:
                 plug.diagnose()
             except:
@@ -697,14 +679,14 @@ No changes will be made to your system.
             self.ui_log.info(_("Please review the following messages:"))
             self.ui_log.info("")
 
-            fp = open(os.path.join(rptdir, "diagnose.txt"), "w")
+            fp = self.get_temp_file()
             for plugname, plug in self.loaded_plugins:
                 for tmpcount2 in range(0, len(plug.diagnose_msgs)):
                     if tmpcount2 == 0:
                         soslog.warning("%s:" % plugname)
                     soslog.warning("    * %s" % plug.diagnose_msgs[tmpcount2])
                     fp.write("%s: %s\n" % (plugname, plug.diagnose_msgs[tmpcount2]))
-            fp.close()
+            self.archive.add_file(fp.name, dest=os.path.join(self.rptdir, 'diagnose.txt'))
 
             self.ui_log.info("")
             if not self.opts.batch:

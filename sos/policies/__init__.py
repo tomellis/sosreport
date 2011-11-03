@@ -50,8 +50,28 @@ class PackageManager(object):
 
 class Policy(object):
 
-    ticketNumber = None
-    reportName = "unset"
+    msg = _("""This utility will collect some detailed  information about the
+hardware and setup of your %(distro)s system.
+The information is collected and an archive is  packaged under
+/tmp, which you can send to a support representative.
+%(distro)s will use this information for diagnostic purposes ONLY
+and it will be considered confidential information.
+
+This process may take a while to complete.
+No changes will be made to your system.
+
+"""
+
+    distro = ""
+
+    def __init__(self):
+        """Subclasses that choose to override this initializer should call
+        super() to ensure that they get the required platform bits attached.
+        super(SubClass, self).__init__()"""
+        self._parse_uname()
+        self.reportName = self.hostname
+        self.ticketNumber = None
+        self.package_manager = PackageManager()
 
     def check(self):
         """
@@ -80,7 +100,7 @@ class Policy(object):
         """
         Verifies that the plugin_class should execute under this policy
         """
-        return False
+        return issubclass(plugin_class, IndependentPlugin)
 
     def preWork(self):
         """
@@ -109,10 +129,9 @@ class Policy(object):
         self.commons = commons
 
     def is_root(self):
+        """This method should return true if the user calling the script is
+        considered to be a superuser"""
         return (os.getuid() == 0)
-
-    def validatePlugin(self, plugin_class):
-        return issubclass(plugin_class, IndependentPlugin)
 
     def displayResults(self, final_filename=None):
 
@@ -218,3 +237,10 @@ class Policy(object):
         silent mode"""
         if not self.commons['cmdlineopts'].silent:
             print msg
+
+    def get_msg(self):
+        """This method is used to prepare the preamble text to display to
+        the user in non-batch mode. If your policy sets self.distro that
+        text will be substituted accordingly. You can also override this
+        method to do something more complicated."""
+        return self.msg % {'distro': self.distro}

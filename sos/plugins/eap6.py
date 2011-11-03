@@ -1,11 +1,6 @@
 import os
 import re
 import zipfile
-import platform
-import fnmatch
-import shlex
-import subprocess
-import string
 import urllib2
 
 try:

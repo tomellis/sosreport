@@ -26,7 +26,6 @@ import random
 import re
 import platform
 import time
-from subprocess import Popen, PIPE, call
 from collections import deque
 
 try:
@@ -37,6 +36,7 @@ except ImportError:
 from sos import _sos as _
 from sos.plugins import RedHatPlugin, IndependentPlugin
 from sos.policies import Policy, PackageManager
+from sos.utilities import shell_out
 
 sys.path.insert(0, "/usr/share/rhn/")
 try:
@@ -51,8 +51,10 @@ except:
 class RHELPackageManager(PackageManager):
 
     def _get_rpm_list(self):
-        pkg_list = subprocess.Popen(["rpm", "-qa", "--queryformat", "%{NAME}|%{VERSION}\\n"],
-            stdout=subprocess.PIPE).communicate()[0].splitlines()
+        pkg_list = shell_out(["rpm",
+            "-qa",
+            "--queryformat",
+            "%{NAME}|%{VERSION}\\n"]).splitlines()
         self._rpms = {}
         for pkg in pkg_list:
             name, version = pkg.split("|")
@@ -89,9 +91,9 @@ class RHELPackageManager(PackageManager):
 class RHELPolicy(Policy):
 
     def __init__(self):
+        super(Policy, self).__init__()
         self.reportName = ""
         self.ticketNumber = ""
-        self._parse_uname()
         self.package_manager = RHELPackageManager()
 
     def validatePlugin(self, plugin_class):
@@ -110,19 +112,15 @@ class RHELPolicy(Policy):
     def pkgByName(self, name):
         return self.package_manager.pkgByName(name)
 
-    def _system(self, cmd):
-        p = Popen(cmd,
+    def runlevelByService(self, name):
+        from subprocess import Popen, PIPE
+        ret = []
+        p = Popen("LC_ALL=C /sbin/chkconfig --list %s" % name,
                   shell=True,
                   stdout=PIPE,
                   stderr=PIPE,
                   bufsize=-1)
-        stdout, stderr = p.communicate()
-        status = p.returncode
-        return stdout, stderr, status
-
-    def runlevelByService(self, name):
-        ret = []
-        out, err, sts = self._system("LC_ALL=C /sbin/chkconfig --list %s" % name)
+        out, err = p.communicate()
         if err:
             return ret
         for tabs in out.split()[1:]:
@@ -213,5 +211,11 @@ class RHELPolicy(Policy):
 
     def packageResults(self, archive_filename):
         self._print(_("Creating compressed archive..."))
+
+    def get_msg(self):
+        msg_dict = {"distro": "Red Hat Enterprise Linux"}
+        if os.path.isfile('/etc/fedora-release'):
+           msg_dict['distro'] = 'Fedora'
+        return self.msg % msg_dict
 
 # vim: ts=4 sw=4 et

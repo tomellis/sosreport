@@ -15,40 +15,27 @@ import os
 import time
 
 from sos.policies import PackageManager, Policy
-from sos.plugins import IndependentPlugin
-import subprocess
-
-try:
-    from hashlib import md5
-except ImportError:
-    from md5 import md5
+from sos.utilities import shell_out
 
 class WindowsPolicy(Policy):
 
-    def __init__(self):
-        self._parse_uname()
-        self.ticketNumber = None
-        self.reportName = self.hostname
-        self.package_manager = PackageManager()
+    distro = "Microsoft Windows"
 
     @classmethod
     def check(class_):
         try:
-            p = subprocess.Popen("ver", shell=True, stdout=subprocess.PIPE)
-            ver_string = p.communicate()[0]
-            return "Windows" in ver_string
+            return "Windows" in shell_out("ver")
         except Exception, e:
             return False
 
     def is_root(self):
-        p = subprocess.Popen("whoami /groups",
-                shell=True, stdout=subprocess.PIPE)
-        stdout = p.communicate()[0]
-        if "S-1-16-12288" in stdout:
+        if "S-1-16-12288" in shell_out("whoami /groups"):
             return True
         else:
+            #TODO: This seems to not work when running inside
+            #the jvm. Perhaps the pipe?
+            import subprocess
             cmd = 'net localgroup administrators | find "%USERNAME"'
-            print cmd
             return subprocess.call(cmd, shell=True) == 0
 
     def preferedArchive(self):
