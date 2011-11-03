@@ -426,7 +426,7 @@ No changes will be made to your system.
             self.soslog.addHandler(console)
 
         # ui log
-        self.ui_log = logging.getLogger('sos.ui')
+        self.ui_log = logging.getLogger('sos_ui')
         self.ui_log.setLevel(logging.INFO)
         self.sos_ui_log_file = self.get_temp_file()
         self.sos_ui_log_file.close()
@@ -456,7 +456,7 @@ No changes will be made to your system.
 
         # the logging module seems to persist in the jython/jboss/eap world
         # so the handlers need to be removed
-        for logger in [logging.getLogger(x) for x in ('sos', 'sosprofile', 'sos.ui')]:
+        for logger in [logging.getLogger(x) for x in ('sos', 'sosprofile', 'sos_ui')]:
             for h in logger.handlers:
                 logger.removeHandler(h)
 
