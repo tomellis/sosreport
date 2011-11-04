@@ -32,11 +32,9 @@ class WindowsPolicy(Policy):
         if "S-1-16-12288" in shell_out("whoami /groups"):
             return True
         else:
-            #TODO: This seems to not work when running inside
-            #the jvm. Perhaps the pipe?
-            import subprocess
-            cmd = 'net localgroup administrators | find "%USERNAME"'
-            return subprocess.call(cmd, shell=True) == 0
+            admins = shell_out("net localgroup administrators")
+            username = shell_out("echo %USERNAME%")
+            return username.strip() in admins
 
     def preferedArchive(self):
         from sos.utilities import ZipFileArchive
