@@ -184,16 +184,13 @@ class EAP6(Plugin, IndependentPlugin):
         opener = urllib2.build_opener()
 
         if username and password:
-            params = {"realm": "ManagementRealm",
-                    "uri": uri,
-                    "user": username,
-                    "passwd": password}
-
-            digest_auth_handler = urllib2.HTTPDigestAuthHandler()
-            digest_auth_handler.add_password(**params)
-
-            basic_auth_handler = urllib2.HTTPBasicAuthHandler()
-            basic_auth_handler.add_password(**params)
+            passwd_manager = urllib2.HTTPPasswordMgrWithDefaultRealm()
+            passwd_manager.add_password(realm="ManagementRealm",
+                                        uri=uri,
+                                        user=username,
+                                        passwd=password)
+            digest_auth_handler = urllib2.HTTPDigestAuthHandler(passwd_manager)
+            basic_auth_handler = urllib2.HTTPBasicAuthHandler(passwd_manager)
 
             opener.add_handler(digest_auth_handler)
             opener.add_handler(basic_auth_handler)
