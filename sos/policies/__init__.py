@@ -4,6 +4,12 @@ import time
 
 from sos.utilities import ImporterHelper, import_module
 from sos.plugins import IndependentPlugin
+from sos import _sos as _
+
+try:
+    from hashlib import md5
+except ImportError:
+    from md5 import md5
 
 def import_policy(name):
     policy_fqname = "sos.policies.%s" % name
@@ -60,7 +66,7 @@ and it will be considered confidential information.
 This process may take a while to complete.
 No changes will be made to your system.
 
-"""
+""")
 
     distro = ""
 
@@ -108,6 +114,12 @@ No changes will be made to your system.
         """
         pass
 
+    def packageResults(self, package_name):
+        """
+        This function is called prior to packaging.
+        """
+        pass
+
     def postWork(self):
         """
         This function is called after the sosreport has been generated.
@@ -150,7 +162,7 @@ No changes will be made to your system.
         fp.close()
 
         self._print()
-        self._print(_("Your sosreport has been generated and saved in:\n  %s") % self.report_file)
+        self._print(_("Your sosreport has been generated and saved in:\n  %s") % final_filename)
         self._print()
         if len(report_md5):
             self._print(_("The md5sum is: ") + report_md5)

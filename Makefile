@@ -9,6 +9,8 @@ REPO = http://svn.fedorahosted.org/svn/sos
 
 SUBDIRS = po sos sos/plugins
 PYFILES = $(wildcard *.py)
+# OS X via brew
+MSGCAT = /usr/local/Cellar/gettext/0.18.1.1/bin/msgcat
 
 
 RPM_BUILD_DIR = rpm-build
@@ -76,7 +78,7 @@ gpgkey:
 po: clean
 	mkdir -p $(PO_DIR)
 	for po in `ls po/*.po`; do \
-		msgcat -p -o $(PO_DIR)/$$(basename $$po | awk -F. '{print $$1}').properties $$po; \
+		$(MSGCAT) -p -o $(PO_DIR)/$$(basename $$po | awk -F. '{print $$1}').properties $$po; \
 	done; \
 
 	cp $(PO_DIR)/en.properties $(PO_DIR)/en_US.properties

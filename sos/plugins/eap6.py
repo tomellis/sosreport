@@ -160,8 +160,11 @@ class EAP6(Plugin, IndependentPlugin):
 
     def query_http(self, request_obj, postdata=None):
         host_port = self.getOption('address')
-        username = self.getOption('user')
-        password = self.getOption('pass')
+        # in the case where we are being called from jdr.sh we will likely
+        # get these things via the sos object
+        import sos
+        username = self.getOption('user') or getattr(sos, 'as7_user', None)
+        password = self.getOption('pass') or getattr(sos, 'as7_pass', None)
 
         uri = "http://" + host_port + "/management" + request_obj.resource + "?"
 
@@ -181,7 +184,7 @@ class EAP6(Plugin, IndependentPlugin):
         opener = urllib2.build_opener()
 
         if username and password:
-            params = {"realm": "PropertiesMgmtSecurityRealm",
+            params = {"realm": "ManagementRealm",
                     "uri": uri,
                     "user": username,
                     "passwd": password}
@@ -209,9 +212,10 @@ class EAP6(Plugin, IndependentPlugin):
         information from a running system.
         """
         for caller, outfile in [
-                (Request(resource="/core-service/platform-mbean/type/threading",
-                        operation="dump-all-threads",
-                        parameters={"locked-synchronizers": "true", "locked-monitors": "true"}), "threaddump.json"),
+                # waiting for the fix in AS7
+#                (Request(resource="/core-service/platform-mbean/type/threading",
+#                        operation="dump-all-threads",
+#                        parameters={"locked-synchronizers": "true", "locked-monitors": "true"}), "threaddump.json"),
                 (Request(resource="/", parameters={"recursive": "true"}), "configuration.json"),
                 ]:
             self.addStringAsFile(self.query(caller), filename=outfile)

@@ -91,7 +91,7 @@ class RHELPackageManager(PackageManager):
 class RHELPolicy(Policy):
 
     def __init__(self):
-        super(Policy, self).__init__()
+        super(RHELPolicy, self).__init__()
         self.reportName = ""
         self.ticketNumber = ""
         self.package_manager = RHELPackageManager()

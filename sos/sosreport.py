@@ -648,7 +648,7 @@ class SoSReport(object):
 
     def batch(self):
         if self.opts.batch:
-            self.ui_log.info(self.policy.get_msg)
+            self.ui_log.info(self.policy.get_msg())
         else:
             msg = self.policy.get_msg()
             msg += _("Press ENTER to continue, or CTRL-C to quit.\n")
