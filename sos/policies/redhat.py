@@ -28,11 +28,6 @@ import platform
 import time
 from collections import deque
 
-try:
-    from hashlib import md5
-except ImportError:
-    from md5 import md5
-
 from sos import _sos as _
 from sos.plugins import RedHatPlugin, IndependentPlugin
 from sos.policies import Policy, PackageManager
@@ -108,6 +103,19 @@ class RHELPolicy(Policy):
     def preferedArchive(self):
         from sos.utilities import TarFileArchive
         return TarFileArchive
+
+    def getPreferredHashAlgorithm(self):
+        checksum = "md5"
+        try:
+            fp = open("/proc/sys/crypto/fips_enabled", "r")
+        except:
+            return checksum
+
+        fips_enabled = fp.read()
+        if fips_enabled.find("1") >= 0:
+            checksum = "sha256"
+        fp.close()
+        return checksum
 
     def pkgByName(self, name):
         return self.package_manager.pkgByName(name)

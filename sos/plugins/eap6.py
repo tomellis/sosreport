@@ -9,7 +9,7 @@ except ImportError:
     import simplejson as json
 
 from sos.plugins import Plugin, IndependentPlugin
-from sos.utilities import DirTree, find, md5sum
+from sos.utilities import DirTree, find, checksum
 
 class Request(object):
 
@@ -90,7 +90,7 @@ class EAP6(Plugin, IndependentPlugin):
         retVal = "?" * 32
 
         try:
-            retVal = md5sum(file, self.__MD5_CHUNK_SIZE)
+            retVal = checksum(file, self.__MD5_CHUNK_SIZE)
         except IOError, ioe:
             self.__alert("ERROR: Unable to open %s for reading.  Error: %s" % (file,ioe))
 
@@ -214,6 +214,8 @@ class EAP6(Plugin, IndependentPlugin):
 #                        operation="dump-all-threads",
 #                        parameters={"locked-synchronizers": "true", "locked-monitors": "true"}), "threaddump.json"),
                 (Request(resource="/", parameters={"recursive": "true"}), "configuration.json"),
+                (Request(resource="/core-service/service-container", operation='dump-service'), "dump-service.json"),
+                (Request(resource="/subsytem/modcluster", operation='read-proxies-configuration'), "cluster-proxies-configuration.json"),
                 ]:
             self.addStringAsFile(self.query(caller), filename=outfile)
 

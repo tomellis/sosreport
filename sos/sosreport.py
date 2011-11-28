@@ -502,12 +502,12 @@ class SoSReport(object):
                 for plugin_class in plugin_classes:
                     if not self.policy.validatePlugin(plugin_class):
                         self.soslog.debug(_("plugin %s does not validate, skipping") % plug)
-                        self._skip(plugin_class, "does not validate")
+                        self._skip(plugin_class, _("does not validate"))
                         continue
 
                     if plugin_class.requires_root and not self._is_root:
                         self.soslog.debug(_("plugin %s requires root permissions to execute, skipping") % plug)
-                        self._skip(plugin_class, "requires root")
+                        self._skip(plugin_class, _("requires root"))
                         continue
 
                     # plug-in is valid, let's decide whether run it or not
@@ -518,7 +518,7 @@ class SoSReport(object):
                             self._is_not_default(plugbase, plugin_class),
                             self._is_not_specified(plugbase),
                             )):
-                        self._skip(plugin_class, "inactive")
+                        self._skip(plugin_class, _("inactive"))
                         continue
 
                     self._load(plugin_class)

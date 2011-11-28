@@ -2,14 +2,10 @@ import os
 import platform
 import time
 
-from sos.utilities import ImporterHelper, import_module
+from sos.utilities import ImporterHelper, import_module, get_hash_name
 from sos.plugins import IndependentPlugin
 from sos import _sos as _
-
-try:
-    from hashlib import md5
-except ImportError:
-    from md5 import md5
+import hashlib
 
 def import_policy(name):
     policy_fqname = "sos.policies.%s" % name
@@ -18,11 +14,15 @@ def import_policy(name):
     except ImportError:
         return None
 
-def load():
+def load(cache={}):
+    if 'policy' in cache:
+        return cache.get('policy')
+
     helper = ImporterHelper(os.path.join('sos', 'policies'))
     for module in helper.get_modules():
         for policy in import_policy(module):
             if policy.check():
+                cache['policy'] = policy()
                 return policy()
     raise Exception("No policy could be loaded.")
 
@@ -145,27 +145,39 @@ No changes will be made to your system.
         considered to be a superuser"""
         return (os.getuid() == 0)
 
+    def _create_checksum(self, final_filename=None):
+        if not final_filename:
+            return False
+
+        archive_fp = open(final_filename, 'r')
+        digest = hashlib.new(get_hash_name())
+        digest.update(fp.read())
+        fp.close()
+        return digest.hexdigest()
+
+
+    def getPreferredHashAlgorithm(self):
+        """Returns the string name of the hashlib-supported checksum algorithm
+        to use"""
+        return "md5"
+
     def displayResults(self, final_filename=None):
 
         # make sure a report exists
         if not final_filename:
            return False
 
-        # calculate md5
-        fp = open(final_filename, "r")
-        report_md5 = md5(fp.read()).hexdigest()
-        fp.close()
-
-        # store md5 into file
-        fp = open(final_filename + ".md5", "w")
-        fp.write(report_md5 + "\n")
+        # store checksum into file
+        fp = open(final_filename + "." + get_hash_name(), "w")
+        checksum = self._create_checksum()
+        fp.write(checksum + "\n")
         fp.close()
 
         self._print()
         self._print(_("Your sosreport has been generated and saved in:\n  %s") % final_filename)
         self._print()
-        if len(report_md5):
-            self._print(_("The md5sum is: ") + report_md5)
+        if checksum:
+            self._print(_("The checksum is: ") + checksum)
             self._print()
         self._print(_("Please send this file to your support representative."))
         self._print()
