@@ -235,6 +235,7 @@ class EAP6(Plugin, IndependentPlugin):
             if os.path.exists(path):
                 ## First get everything in the conf dir
                 confDir = os.path.join(path, "configuration")
+                self.addForbiddenPath(os.path.join(confDir, 'mgmt-users.properties'))
 
                 self.doCopyFileOrDir(confDir, sub=(self.__jbossHome, 'JBOSSHOME'))
                 ## Log dir next
@@ -278,22 +279,24 @@ class EAP6(Plugin, IndependentPlugin):
         Obfuscate passwords.
         """
 
+        password_xml_regex = re.compile(r'<password>.*</password>', re.IGNORECASE)
+
         for dir_ in self.__jbossServerConfigDirs:
             path = os.path.join(self.__jbossHome, dir_)
 
-            self.doRegexSub(os.path.join(path,"configuration","login-config.xml"),
-                            re.compile(r'"password".*>.*</module-option>', re.IGNORECASE),
-                            r'"password">********</module-option>')
+            self.doRegexSub(os.path.join(path,"configuration","*.xml"),
+                            password_xml_regex,
+                            r'<password>********</password>')
 
-            tmp = os.path.join(path,"conf", "props")
+            tmp = os.path.join(path,"configuration")
             for propFile in find("*-users.properties", tmp):
                 self.doRegexSub(propFile,
                                 r"=(.*)",
                                 r'=********')
 
 #             Remove PW from -ds.xml files
-            tmp = os.path.join(path, "deploy")
+            tmp = os.path.join(path, "deployments")
             for dsFile in find("*-ds.xml", tmp):
                 self.doRegexSub(dsFile,
-                                re.compile(r"<password.*>.*</password.*>", re.IGNORECASE),
+                                password_xml_regex,
                                 r"<password>********</password>")
