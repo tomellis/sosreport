@@ -10,7 +10,8 @@ REPO = http://svn.fedorahosted.org/svn/sos
 SUBDIRS = po sos sos/plugins
 PYFILES = $(wildcard *.py)
 # OS X via brew
-MSGCAT = /usr/local/Cellar/gettext/0.18.1.1/bin/msgcat
+# MSGCAT = /usr/local/Cellar/gettext/0.18.1.1/bin/msgcat
+MSGCAT = msgcat
 
 
 RPM_BUILD_DIR = rpm-build
