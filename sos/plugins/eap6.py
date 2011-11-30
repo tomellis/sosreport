@@ -220,7 +220,7 @@ class EAP6(Plugin, IndependentPlugin):
 #                        parameters={"locked-synchronizers": "true", "locked-monitors": "true"}), "threaddump.json"),
                 (Request(resource="/", parameters={"recursive": "true"}), "configuration.json"),
                 (Request(resource="/core-service/service-container", operation='dump-service'), "dump-service.json"),
-                (Request(resource="/subsytem/modcluster", operation='read-proxies-configuration'), "cluster-proxies-configuration.json"),
+                (Request(resource="/subsystem/modcluster", operation='read-proxies-configuration'), "cluster-proxies-configuration.json"),
                 ]:
             self.addStringAsFile(self.query(caller), filename=outfile)
 
