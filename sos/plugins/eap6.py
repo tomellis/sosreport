@@ -16,7 +16,10 @@ class Request(object):
     def __init__(self, resource, operation="read-resource", parameters=None):
         self.resource = resource
         self.operation = operation
-        self.parameters = parameters
+        if parameters:
+            self.parameters = parameters
+        else:
+            self.parameters = {}
 
     def url_parts(self):
         """Generator function to split a url into (key, value) tuples. The url
@@ -199,9 +202,11 @@ class EAP6(Plugin, IndependentPlugin):
 
         try:
             resp = opener.open(req)
-            resp.read()
+            return resp.read()
         except Exception, e:
-            self.addAlert("Could not query url: %s; error: %s" % (uri, e))
+            err_msg = "Could not query url: %s; error: %s" % (uri, e)
+            self.addAlert(err_msg)
+            return err_msg
 
     def get_online_data(self):
         """

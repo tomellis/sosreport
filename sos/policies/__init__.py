@@ -151,8 +151,8 @@ No changes will be made to your system.
 
         archive_fp = open(final_filename, 'r')
         digest = hashlib.new(get_hash_name())
-        digest.update(fp.read())
-        fp.close()
+        digest.update(archive_fp.read())
+        archive_fp.close()
         return digest.hexdigest()
 
 
@@ -169,8 +169,9 @@ No changes will be made to your system.
 
         # store checksum into file
         fp = open(final_filename + "." + get_hash_name(), "w")
-        checksum = self._create_checksum()
-        fp.write(checksum + "\n")
+        checksum = self._create_checksum(final_filename)
+        if checksum:
+            fp.write(checksum + "\n")
         fp.close()
 
         self._print()
@@ -260,7 +261,11 @@ No changes will be made to your system.
         """A wrapper around print that only prints if we are not running in
         silent mode"""
         if not self.commons['cmdlineopts'].silent:
-            print msg
+            if msg:
+                print msg
+            else:
+                print
+
 
     def get_msg(self):
         """This method is used to prepare the preamble text to display to

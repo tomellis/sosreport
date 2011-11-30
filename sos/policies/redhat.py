@@ -192,7 +192,7 @@ class RHELPolicy(Policy):
         localname = self.rhnUsername()
         if len(localname) == 0: localname = self.hostName()
 
-        if not self.commons['cmdlineopts'].batch and not self.cInfo['cmdlineopts'].silent:
+        if not self.commons['cmdlineopts'].batch and not self.commons['cmdlineopts'].silent:
             try:
                 self.reportName = raw_input(_("Please enter your first initial and last name [%s]: ") % localname)
                 self.reportName = re.sub(r"[^a-zA-Z.0-9]", "", self.reportName)
