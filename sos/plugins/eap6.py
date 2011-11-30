@@ -169,7 +169,7 @@ class EAP6(Plugin, IndependentPlugin):
         username = self.getOption('user') or getattr(sos, 'as7_user', None)
         password = self.getOption('pass') or getattr(sos, 'as7_pass', None)
 
-        uri = "http://" + host_port + "/management" + request_obj.resource + "?"
+        uri = "http://" + host_port + "/management"
 
         json_data = {'operation': request_obj.operation,
                      'address': []}
@@ -219,7 +219,7 @@ class EAP6(Plugin, IndependentPlugin):
 #                        operation="dump-all-threads",
 #                        parameters={"locked-synchronizers": "true", "locked-monitors": "true"}), "threaddump.json"),
                 (Request(resource="/", parameters={"recursive": "true"}), "configuration.json"),
-                (Request(resource="/core-service/service-container", operation='dump-service'), "dump-service.json"),
+                (Request(resource="/core-service/service-container", operation='dump-services'), "dump-services.json"),
                 (Request(resource="/subsystem/modcluster", operation='read-proxies-configuration'), "cluster-proxies-configuration.json"),
                 ]:
             self.addStringAsFile(self.query(caller), filename=outfile)
