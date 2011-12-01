@@ -46,7 +46,8 @@ class EAP6(Plugin, IndependentPlugin):
           ("home",  "JBoss's installation dir (i.e. JBOSS_HOME)", '', False),
           ("logsize", 'max size (MiB) to collect per log file', '', 15),
           ("stdjar",  'Collect jar statistics for standard jars.', '', True),
-          ("address", 'hostname:port of the management api for jboss', '', 'localhost:9990'),
+          ("host", 'hostname of the management api for jboss', '', 'localhost'),
+          ("port", 'port of the management api for jboss', '', '9990'),
           ("user", 'username for management console', '', None),
           ("pass", 'password for management console', '', None),
           ("appxml",  "comma separated list of application's whose XML descriptors you want. The keyword 'all' will collect all descriptors in the designated profile(s).", '', False),
@@ -162,14 +163,17 @@ class EAP6(Plugin, IndependentPlugin):
         return sos.controllerClient.execute(request).toJSONString(True)
 
     def query_http(self, request_obj, postdata=None):
-        host_port = self.getOption('address')
         # in the case where we are being called from jdr.sh we will likely
         # get these things via the sos object
         import sos
+
+        host = getattr(sos, 'as7_host', None) or self.getOption('host')
+        port = getattr(sos, 'as7_port', None) or self.getOption('port')
+
         username = self.getOption('user') or getattr(sos, 'as7_user', None)
         password = self.getOption('pass') or getattr(sos, 'as7_pass', None)
 
-        uri = "http://" + host_port + "/management"
+        uri = "http://" + host + ":" + port + "/management"
 
         json_data = {'operation': request_obj.operation,
                      'address': []}
