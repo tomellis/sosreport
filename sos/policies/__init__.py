@@ -18,7 +18,8 @@ def load(cache={}):
     if 'policy' in cache:
         return cache.get('policy')
 
-    helper = ImporterHelper(os.path.join('sos', 'policies'))
+    import sos.policies
+    helper = ImporterHelper(sos.policies)
     for module in helper.get_modules():
         for policy in import_policy(module):
             if policy.check():

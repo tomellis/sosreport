@@ -141,17 +141,15 @@ class EAP6(Plugin, IndependentPlugin):
     def query(self, request_obj):
         try:
             return self.query_java(request_obj)
-        # ImportError is when we try to import java stuff
-        # we raise an AttributeError if the controller_client_proxy is
-        # unavailable
-        except (ImportError, AttributeError):
+        except Exception, e:
+            self.addAlert("JBOSS API call failed, falling back to HTTP: %s" % e)
             return self.query_http(request_obj)
 
     def query_java(self, request_obj):
         from org.jboss.dmr import ModelNode
         controller_client = self.getOption('controller_client_proxy')
         if not controller_client:
-            raise AttributeError
+            raise AttributeError("Controller Client is not available")
 
         request = ModelNode()
         request.get("operation").set(request_obj.operation)
