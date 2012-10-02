@@ -27,7 +27,6 @@ class eucalyptus(sos.plugintools.PluginBase):
     def setup(self):
         self.addCopySpec("/etc/eucalyptus/")
         self.addCopySpec("/var/log/eucalyptus/")
-        # Eucalyptus NC
-        if self.isInstalled("eucalyptus-nc"):
-            self.collectExtOutput("/usr/sbin/brctl show")
+	# Generic Eucalyptus Networking (not included in other plugins)
+        self.collectExtOutput("/sbin/arp -a")
         return
