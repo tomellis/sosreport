@@ -29,4 +29,13 @@ class eucalyptus(sos.plugintools.PluginBase):
         self.addCopySpec("/var/log/eucalyptus/")
 	# Generic Eucalyptus Networking (not included in other plugins)
         self.collectExtOutput("/sbin/arp -a")
+
+        clc_commands = ['euca-describe-services -E -A',
+                        'euca-describe-availability-zones verbose',
+                        'euca-describe-instances verbose',
+                        'euca-describe-volumes verbose',
+                        'euca-describe-snapshots verbose',
+                        'euca-describe-keypairs verbose',
+                        'euca-describe-groups verbose']
+
         return
