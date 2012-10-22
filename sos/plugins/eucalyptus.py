@@ -15,6 +15,7 @@
 ## Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 import sos.plugintools
+import os, sys
 
 class eucalyptus(sos.plugintools.PluginBase):
     """Eucalyptus Cloud related information
@@ -38,4 +39,11 @@ class eucalyptus(sos.plugintools.PluginBase):
                         'euca-describe-keypairs verbose',
                         'euca-describe-groups verbose']
 
+        try:
+            os.environ["EC2_URL"] and os.environ["EC2_ACCESS_KEY"] and os.environ["EC2_SECRET_KEY"]
+            for cmd in clc_commands:
+                 os.system(cmd)
+        except KeyError:
+                print "Eucalyptus Environment not sourced, skipping euca commands."
+                sys.exit(1)
         return
