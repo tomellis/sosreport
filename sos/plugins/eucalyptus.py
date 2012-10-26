@@ -37,7 +37,8 @@ class eucalyptus(sos.plugintools.PluginBase):
                         'euca-describe-volumes verbose',
                         'euca-describe-snapshots verbose',
                         'euca-describe-keypairs verbose',
-                        'euca-describe-groups verbose']
+                        'euca-describe-groups verbose',
+                        'euca-describe-properties']
 
         try:
             os.environ["EC2_URL"] and os.environ["EC2_ACCESS_KEY"] and os.environ["EC2_SECRET_KEY"]
