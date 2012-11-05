@@ -26,11 +26,13 @@ class eucalyptus(sos.plugintools.PluginBase):
         return False
 
     def setup(self):
+        # Eucalyptus logs
         self.addCopySpec("/etc/eucalyptus/")
         self.addCopySpec("/var/log/eucalyptus/")
 	# Generic Eucalyptus Networking (not included in other plugins)
         self.collectExtOutput("/sbin/arp -a")
 
+        # Useful output from euca2ools commands
         clc_commands = ['euca-describe-services -E -A',
                         'euca-describe-availability-zones verbose',
                         'euca-describe-instances verbose',
