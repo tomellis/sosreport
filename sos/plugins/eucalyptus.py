@@ -40,13 +40,17 @@ class eucalyptus(sos.plugintools.PluginBase):
                         'euca-describe-snapshots verbose',
                         'euca-describe-keypairs verbose',
                         'euca-describe-groups verbose',
-                        'euca-describe-properties']
+                        'euca-describe-properties',
+                        'euare-accountlist',
+                        'euare-getldapsyncstatus']
 
         try:
+            # Only run euca2ools commands if cloud creds are present in environment
             os.environ["EC2_URL"] and os.environ["EC2_ACCESS_KEY"] and os.environ["EC2_SECRET_KEY"]
             for cmd in clc_commands:
-                 os.system(cmd)
+                 # Shorten default timeout, 2mins per command
+                 self.collectExtOutput(cmd, timeout = 120)
         except KeyError:
-                print "Eucalyptus Environment not sourced, skipping euca commands."
+                print "Eucalyptus Credentials not in environment, skipping euca commands."
                 sys.exit(1)
         return
