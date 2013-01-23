@@ -1,4 +1,4 @@
-## Copyright (C) 2012 Eucalyptus Systems, Inc., Tom Ellis <tellis@eucalyptus.com>
+## Copyright (C) 2012-2013 Eucalyptus Systems, Inc., Tom Ellis <tellis@eucalyptus.com>
 
 ### This program is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -52,5 +52,4 @@ class eucalyptus(sos.plugintools.PluginBase):
                  self.collectExtOutput(cmd, timeout = 120)
         except KeyError:
                 print "Eucalyptus Credentials not in environment, skipping euca commands."
-                sys.exit(1)
         return
